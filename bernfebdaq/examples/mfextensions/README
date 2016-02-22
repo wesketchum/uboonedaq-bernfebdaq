@@ -1,0 +1,6 @@
+mfextensions Example:
+
+Demonstrates the artdaq-mfextensions package and the ARTDAQ Message
+Viewer GUI. This utility can be used to view, sort, and filter the
+MessageFacility messages produced by all of the applications and
+modules within the ARTDAQ system.

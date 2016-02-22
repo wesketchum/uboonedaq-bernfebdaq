@@ -1,0 +1,7 @@
+ASCII Simulator Example
+
+This example uses the AsciiSimulator_generator class to generate files which contain ASCII
+ strings. The AsciiSimulator may be configured to dump data from the generator to a file, 
+which can then be compared with the output of the asciiDump ART module. This serves as a 
+proof of ARTDAQ's data-handling safety, as the output root file can be analyzed and the 
+original raw bitstream reproduced.

@@ -1,0 +1,5 @@
+cfgManagement Example:
+
+Demonstrates a simple configuration scheme using artdaq-utilities'
+Node.js server. Single-layer systems of arbitrary size may be defined
+and run from the Web-based GUI.

@@ -1,0 +1,19 @@
+#include "bernfebdaq/BuildInfo/GetPackageBuildInfo.hh"
+
+#include <string>
+
+namespace demo {
+
+  artdaq::PackageBuildInfo GetPackageBuildInfo::getPackageBuildInfo() {
+
+    artdaq::PackageBuildInfo pkg;
+
+    pkg.setPackageName("artdaq-demo");
+    pkg.setPackageVersion("@version@");
+    pkg.setBuildTimestamp("@utcDateTime@");
+
+    return pkg;
+  }
+
+}
+

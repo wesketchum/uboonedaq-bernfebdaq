@@ -1,0 +1,34 @@
+genToArt:
+{
+  run_number: 10
+  events_to_generate: 5
+
+  fragment_receiver:
+  {
+    generators: [ gen ]
+    gen:
+    {
+      generator: ToySimulator
+      fragment_type: TOY2
+      nADCcounts: 100
+      board_id: 0
+      fragment_id: 0
+   }
+  }
+
+  event_builder:
+  {
+    queue_size: 20
+    timeout: 5.0
+    print_stats: false
+  }
+}
+
+process_name: TEST
+
+source:
+{
+  module_type: RawInput
+  waiting_time: 25.0
+  # fragment_type_map: [[1, \"missed\"], [3, \"V1720\"], [4, \"V1724\"], [6, \"Toy1\"], [7, \"Toy2\"] ]
+}

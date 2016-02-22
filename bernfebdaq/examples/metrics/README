@@ -1,0 +1,5 @@
+metrics Example:
+
+Demonstrates all of the metric-collection methods available in
+ARTDAQ. Will download and install the artdaq_ganglia_plugin and
+artdaq_epics_plugin.

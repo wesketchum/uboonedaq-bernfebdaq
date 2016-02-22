@@ -1,0 +1,6 @@
+udpReceiver Example:
+
+Demonstrates the UDPReceiver_generator class. Also contains a script
+to send in UDP packets that will trigger the system. As with the
+asciiSimulator example, this can be used to demonstrate ARTDAQ's
+data preservation throughout the readout.

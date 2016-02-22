@@ -1,0 +1,21 @@
+echo # This script is intended to be sourced.
+
+export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
+   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
+   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
+
+sh -c "[ `ps $$ | grep bash | wc -l` -gt 0 ] || { echo 'Please switch to the bash shell before running the artdaq-demo.'; exit; }" || exit
+
+source $ARTDAQ_PRODUCTS/setup
+
+export PRODUCTS=$INSTALL_DIR:$PRODUCTS
+export CETPKG_INSTALL=$INSTALL_DIR
+
+export BUILD_DIR="$BASE_DIR/build_$BASE_NAME"
+export REPO_DIR="$BASE_DIR/$BASE_NAME"
+
+mkdir -p $BUILD_DIR
+
+echo changing directory to $BUILD_DIR
+cd $BUILD_DIR  # note: next line adjusts PATH based one cwd
+. $REPO_DIR/ups/setup_for_development -p 

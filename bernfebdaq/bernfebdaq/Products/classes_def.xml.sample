@@ -1,0 +1,21 @@
+<lcgdict>
+  <class name="demo::CompressedV172x::HeaderProxy"/>
+  <class name="demo::CompressedV172x::MetadataProxy"/>
+  <class name="demo::CompressedV172x::V172xHeaderVec"/>
+  <class name="demo::CompressedV172x::V172xMetadataVec"/>
+  <class name="demo::CompressedV172x::MetadataPresentVec"/>
+  <class name="demo::CompressedV172x::DataVec"/>
+  <class name="demo::CompressedV172x::CompVec"/>
+  <class name="demo::CompressedV172x::CountVec"/>
+  <class name="demo::CompressedV172x" ClassVersion="15">
+   <version ClassVersion="15" checksum="2077283346"/>
+   <version ClassVersion="14" checksum="2329124239"/>
+  </class>
+  <class name="art::Wrapper<demo::CompressedV172x>" compression="0"/>
+  <class name="darkart::Channel" ClassVersion="10">
+   <version ClassVersion="10" checksum="796297462"/>
+  </class>
+  <class name="std::vector<darkart::Channel>"/>
+  <class name="art::Wrapper<std::vector<darkart::Channel> >"/>
+  <class name="art::Wrapper<darkart::Channel>"/>
+</lcgdict>
