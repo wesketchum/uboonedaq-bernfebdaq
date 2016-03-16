@@ -74,8 +74,8 @@ public:
 
 private:
 
-  int64_t _time_start;
-  int64_t _time_end;
+  int64_t _time_start; //nanoseconds since epoch? or start of run
+  int64_t _time_end;   //nanoseconds since epoch? or start of run
 
   uint32_t _run_number;
   uint32_t _subrun_number;

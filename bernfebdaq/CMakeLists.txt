@@ -66,7 +66,7 @@ include(BuildPlugins)
 include(CetTest)
 
 # source
-#add_subdirectory(bernfebdaq)
+add_subdirectory(bernfebdaq)
 
 # testing
 #add_subdirectory(test)
