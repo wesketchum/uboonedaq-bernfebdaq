@@ -1,6 +1,3 @@
-#ifndef bernfebdaq_Generators_BernFEB_hh
-#define bernfebdaq_Generators_BernFEB_hh
-
 #include "fhiclcpp/fwd.h"
 #include "artdaq-core/Data/Fragments.hh" 
 #include "artdaq/Application/CommandableFragmentGenerator.hh"
@@ -54,7 +51,7 @@ namespace bernfebdaq {
     virtual void ConfigureStop() = 0;  //called in stop()
 
     //gets the data. Output is size of data filled. Input is FEM ID.
-    virtual size_t GetFEMData(uint64_t const&) = 0;
+    virtual size_t GetFEBData(uint64_t const&) = 0;
 
     size_t last_read_data_size_;
     int    last_status_;
@@ -68,11 +65,11 @@ namespace bernfebdaq {
     virtual void Initialize();     //called in constructor
     virtual void Cleanup();        //called in destructor
 
-  private:
     std::unique_ptr<BernFEBEvent[]> FEBDTPBufferUPtr;
     uint32_t FEBDTPBufferCapacity_;
     uint32_t FEBDTPBufferSizeBytes_;
 
+  private:
     typedef struct FEBBuffer{
       std::deque<BernFEBEvent> buffer;
       size_t   time_resets;
@@ -98,4 +95,3 @@ namespace bernfebdaq {
   };
 }
 
-#endif /* artdaq_demo_Generators_BernFEB_hh */

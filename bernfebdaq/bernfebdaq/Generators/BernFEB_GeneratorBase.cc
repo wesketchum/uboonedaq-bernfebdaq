@@ -91,7 +91,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 {
   size_t this_n_events=0,n_events=0;
   for(auto const& id : FEBIDs_){
-    this_n_events = GetFEMData(id)/sizeof(BernFEBEvent);
+    this_n_events = GetFEBData(id)/sizeof(BernFEBEvent);
     FEBDequeBuffers_[id].buffer.insert(FEBDequeBuffers_[id].buffer.end(),&(FEBDTPBufferUPtr[0]),&(FEBDTPBufferUPtr[this_n_events]));
     n_events += this_n_events;
   }
