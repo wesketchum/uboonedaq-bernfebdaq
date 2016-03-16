@@ -1,7 +1,12 @@
+art_make_library( LIBRARY_NAME bernfebdaq-WorkerThread
+		  SOURCE workerThread.cpp )
+
+
 art_make_library( LIBRARY_NAME bernfebdaq-BernFEB_GeneratorBase
 		  SOURCE BernFEB_GeneratorBase.cc
 		  LIBRARIES
 			bernfebdaq-core_Overlays
+			bernfebdaq-WorkerThread
 			artdaq_Application
 			artdaq_DAQdata
 			artdaq-core_Utilities

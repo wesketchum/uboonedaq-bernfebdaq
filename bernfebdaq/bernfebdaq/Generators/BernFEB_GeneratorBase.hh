@@ -15,6 +15,8 @@
 #include <unordered_map>
 #include <atomic>
 
+#include "workerThread.h"
+
 namespace bernfebdaq {    
 
   class BernFEB_GeneratorBase : public artdaq::CommandableFragmentGenerator{
@@ -91,6 +93,8 @@ namespace bernfebdaq {
     bool GetData();
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
     
+    WorkerThreadUPtr GetData_thread_;
+
   };
 }
 

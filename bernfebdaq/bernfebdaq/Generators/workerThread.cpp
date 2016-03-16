@@ -5,6 +5,7 @@
 #include <sstream>
 #include <type_traits>
 #include <iostream>
+#include <unistd.h>
 
 #include "workerThread.h"
 
@@ -51,7 +52,7 @@ void bernfebdaq::WorkerThread::stop(){
   std::cout << "WorkerThread: " << _functor->name() << " exit code=" << _worker_thread_result.get() << std::endl;
 }
 
-uint64_t bernfebdaq::WorkerThread::run() noexcept {
+uint64_t bernfebdaq::WorkerThread::run() {
     uint64_t iterationCount = 0;
     std::cout << "WorkerThread: " << _functor->name() << " started running." << std::endl;;
 

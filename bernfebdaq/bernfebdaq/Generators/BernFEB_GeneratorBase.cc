@@ -67,10 +67,16 @@ void bernfebdaq::BernFEB_GeneratorBase::start() {
     FEBDequeBuffers_[id] = FEBBuffer_t();
   FEBDTPBufferUPtr.reset(new BernFEBEvent[FEBDTPBufferCapacity_]);
 
+  ThreadFunctor functor = std::bind(&BernFEB_GeneratorBase::GetData,this);
+  auto worker_functor = WorkerThreadFunctorUPtr(new WorkerThreadFunctor(functor,"GetDataWorkerThread"));
+  auto getData_worker = WorkerThread::createWorkerThread(worker_functor);
+  GetData_thread_.swap(getData_worker);
 
+  GetData_thread_->start();
 }
 
 void bernfebdaq::BernFEB_GeneratorBase::stop() {
+  GetData_thread_->stop();
   ConfigureStop();
 }
 

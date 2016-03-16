@@ -45,7 +45,7 @@ namespace bernfebdaq{
       createWorkerThread (WorkerThreadFunctorUPtr& functor,
 			  unsigned int usec_delay_if_failed=10e3,
 			  unsigned int max_stop_tries=10) {
-      return WorkerThreadUPtr ( new WorkerThread (functor,max_stop_tries));
+      return WorkerThreadUPtr ( new WorkerThread (functor,usec_delay_if_failed,max_stop_tries));
     }
     
     void start();
