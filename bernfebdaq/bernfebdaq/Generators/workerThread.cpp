@@ -25,8 +25,10 @@ bernfebdaq::WorkerThread::WorkerThread(WorkerThreadFunctorUPtr& functor,
 }
 
 void bernfebdaq::WorkerThread::start(){
+  std::cout << "WorkerThread: Starting " << _functor->name() << std::endl;
   _stop_running=false;
   _worker_thread_result = std::async ( std::launch::async, &WorkerThread::run, this );
+  std::cout << "WorkerThread: Started " << _functor->name() << std::endl;
 }
 
 void bernfebdaq::WorkerThread::stop(){

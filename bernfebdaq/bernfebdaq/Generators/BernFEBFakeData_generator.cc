@@ -13,7 +13,7 @@ bernfebdaq::BernFEBFakeData::BernFEBFakeData(fhicl::ParameterSet const & ps)
   :
   BernFEB_GeneratorBase(ps)
 {
-  Initialize();
+  //Initialize();
 }
 
 bernfebdaq::BernFEBFakeData::~BernFEBFakeData(){
@@ -26,6 +26,8 @@ void bernfebdaq::BernFEBFakeData::ConfigureStart(){
   //double rate_per_ns = (double)ps_.get<unsigned int>("cosmic_rate",2500)/1.0e9;
   //poisson_distn_.reset(new std::poisson_distribution<int>(rate_per_ns*SequenceTimeWindowSize_));
 
+  data_wait_time_ = ps_.get<int>("data_wait_time",5e5);
+
   for(auto const& id : FEBIDs_)
     time_map_[id] = 0;
 }
@@ -33,6 +35,8 @@ void bernfebdaq::BernFEBFakeData::ConfigureStart(){
 void bernfebdaq::BernFEBFakeData::ConfigureStop(){}
 
 size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
+
+  usleep(data_wait_time_);
 
   size_t n_events = 5;
   
@@ -46,6 +50,8 @@ size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
 		    nChannels_,
 		    [&](){ return static_cast<uint16_t>((*uniform_distn_)( engine_)); });
     FEBDTPBufferUPtr[i_e] = feb_data;
+
+    std::cout << feb_data << std::endl;
   }
   return n_events*sizeof(BernFEBEvent);
 }

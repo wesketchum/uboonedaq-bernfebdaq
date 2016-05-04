@@ -11,7 +11,7 @@ makeConfigs.rb
 multi_udp_send_artdaq.py)
 
 
-art_make_exec(demo_driver
+art_make_exec(test_driver
   LIBRARIES
   artdaq_Application
   artdaq_DAQrate

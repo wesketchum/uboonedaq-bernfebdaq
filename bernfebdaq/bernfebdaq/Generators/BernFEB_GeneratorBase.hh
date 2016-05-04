@@ -75,12 +75,12 @@ namespace bernfebdaq {
       size_t   time_resets;
       int64_t  next_time_start;
       uint32_t overwritten_counter;
-      uint32_t last_time_counter;
+      int32_t  last_time_counter;
       FEBBuffer():buffer(std::deque<BernFEBEvent>()),
 		  time_resets(0),
 		  next_time_start(0),
 		  overwritten_counter(0),
-		  last_time_counter(0){}
+		  last_time_counter(-1){}
     } FEBBuffer_t;
 
     std::unordered_map< uint64_t, FEBBuffer_t > FEBDequeBuffers_;

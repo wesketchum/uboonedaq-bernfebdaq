@@ -42,6 +42,7 @@ std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBEvent const & 
     if(i_c%8==0) os << "\n\t\t";
     os << "0x" << e.adc[i_c] << " ";
   }
+  os << std::dec;
   os << std::endl;
   return os;
 }

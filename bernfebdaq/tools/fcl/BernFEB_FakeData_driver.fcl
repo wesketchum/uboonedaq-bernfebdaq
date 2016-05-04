@@ -14,14 +14,17 @@ fragment_receiver: {
    # Parameters configuring the fragment generator's parent class
    # artdaq::CommandableFragmentGenerator
 
+   board_id: 1
+
    RunNumber: 101
-   SubrunTimeWindowSize: 600e9
-   SequenceTimeWindowSize: 1e6
+   SubrunTimeWindowSize: 1e5
+   SequenceTimeWindowSize: 1e5
 
    nADCBits: 12
    nChannels: 32
    ReaderID: 0x1
-   FEBIDs : [ 0x1234567, 0x2345678, 0x3456789, 0x456789a, 0x56789ab ]
+   #FEBIDs : [ 0x1234567, 0x2345678, 0x3456789, 0x456789a, 0x56789ab ]
+   FEBIDs : [0x1234567]
 
    FEBDequeBufferCapacity: 5e3
    FEBDTPBufferCapacity: 1024
@@ -30,6 +33,7 @@ fragment_receiver: {
    throttle_usecs_check: 0
 
    random_seed: 314159
+   data_wait_time: 5e6
 
 
 }  		  
@@ -53,9 +57,8 @@ physics:
   {
     dump:
     {
-      module_type: CAEN2795Dump
+      module_type: BernFEBDump
       raw_data_label: "daq"
-      num_adcs_to_show: 50   # Obviously this should be no more than ADC counts per fragment
     }
   }
 

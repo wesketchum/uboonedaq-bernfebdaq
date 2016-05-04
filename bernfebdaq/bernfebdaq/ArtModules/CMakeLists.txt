@@ -8,8 +8,8 @@
 #  LIB_LIBRARIES artdaq-core-demo_Overlays 
 #)
 
-#simple_plugin(CAEN2795Dump "module"
-#              icartdaq-core_Overlays)
+simple_plugin(BernFEBDump "module"
+              bernfebdaq-core_Overlays)
 
 # Subdirectories.
 #add_subdirectory(DQM)
