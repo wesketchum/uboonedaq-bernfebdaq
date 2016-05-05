@@ -22,8 +22,13 @@ namespace bernfebdaq {
 
     std::mt19937 engine_;
     std::unique_ptr<std::uniform_int_distribution<int>> uniform_distn_;
-    //std::unique_ptr<std::poisson_distribution<int>> poisson_distn_;
     int data_wait_time_;
+    size_t events_per_packet_;
+    unsigned int time_increment_per_event_;
+    std::vector<unsigned int> missing_events_mod_;
+
+    uint32_t time1_max_;
+    uint32_t time2_max_;
 
     std::map<uint64_t,int64_t> time_map_;
 

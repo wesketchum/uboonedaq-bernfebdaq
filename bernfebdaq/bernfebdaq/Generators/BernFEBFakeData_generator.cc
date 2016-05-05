@@ -32,6 +32,13 @@ void bernfebdaq::BernFEBFakeData::ConfigureStart(){
   //poisson_distn_.reset(new std::poisson_distribution<int>(rate_per_ns*SequenceTimeWindowSize_));
 
   data_wait_time_ = ps_.get<int>("data_wait_time",5e5);
+  events_per_packet_ = ps_.get<size_t>("events_per_packet",5);
+  time_increment_per_event_ = ps_.get<unsigned int>("time_increment_per_event",49999);
+
+  missing_events_mod_ = ps_.get<std::vector<unsigned int>>("missing_events_mod",{3,7,23});
+
+  time1_max_ = ps_.get<uint32_t>("time1_max",1e9);
+  time2_max_ = ps_.get<uint32_t>("time1_max",4e9);
 
   for(auto const& id : FEBIDs_)
     time_map_[id] = 0;
@@ -49,14 +56,19 @@ size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
 
   usleep(data_wait_time_);
 
-  size_t n_events = 5;
-  
   BernFEBEvent feb_data;
-  for(size_t i_e=0; i_e<n_events; ++i_e){
-    feb_data.flags_word = 0xdeadbeef;
-    feb_data.time1 = time_map_[feb_id] & 0xffffffff;
-    feb_data.time2 = time_map_[feb_id] & 0xffff;
-    time_map_[feb_id] += 9999;
+  for(size_t i_e=0; i_e<events_per_packet_; ++i_e){
+
+    feb_data.flags.overwritten = 0;
+    feb_data.flags.missed = 0;
+
+    for(auto const& mod : missing_events_mod_) 
+      if(i_e%mod==0) feb_data.flags.missed++;
+
+    feb_data.time1 = time_map_[feb_id] % time1_max_;
+    feb_data.time2 = time_map_[feb_id] % time2_max_;
+    time_map_[feb_id] += time_increment_per_event_;
+
     std::generate_n(feb_data.adc,
 		    nChannels_,
 		    [&](){ return static_cast<uint16_t>((*uniform_distn_)( engine_)); });
@@ -67,9 +79,9 @@ size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
   }
 
   TRACE(TR_GD_LOG,"BernFEBFakeData::GetFEBData() completed, events=%lu, data_size=%lu",
-	n_events,n_events*sizeof(BernFEBEvent));  
+	events_per_packet_,events_per_packet_*sizeof(BernFEBEvent));  
 
-  return n_events*sizeof(BernFEBEvent);
+  return events_per_packet_*sizeof(BernFEBEvent);
 }
 
 DEFINE_ARTDAQ_COMMANDABLE_GENERATOR(bernfebdaq::BernFEBFakeData) 
