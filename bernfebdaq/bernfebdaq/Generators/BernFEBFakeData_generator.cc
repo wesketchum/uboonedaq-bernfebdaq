@@ -8,19 +8,24 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include "trace_defines.h"
 
 bernfebdaq::BernFEBFakeData::BernFEBFakeData(fhicl::ParameterSet const & ps)
   :
   BernFEB_GeneratorBase(ps)
 {
-  //Initialize();
+  TRACE(TR_LOG,"BernFEBFakeData constructor called");  
+  TRACE(TR_LOG,"BernFEBFakeData constructor completed");  
 }
 
 bernfebdaq::BernFEBFakeData::~BernFEBFakeData(){
+  TRACE(TR_LOG,"BernFEBFakeData destructor called");  
   Cleanup();
+  TRACE(TR_LOG,"BernFEBFakeData destructor completed");  
 }
 
 void bernfebdaq::BernFEBFakeData::ConfigureStart(){
+  TRACE(TR_LOG,"BernFEBFakeData::ConfigureStart() called");  
   engine_ = std::mt19937(ps_.get<int64_t>("random_seed", 314159));
   uniform_distn_.reset(new std::uniform_int_distribution<int>(0, std::pow(2,nADCBits_ - 1 )));
   //double rate_per_ns = (double)ps_.get<unsigned int>("cosmic_rate",2500)/1.0e9;
@@ -30,11 +35,17 @@ void bernfebdaq::BernFEBFakeData::ConfigureStart(){
 
   for(auto const& id : FEBIDs_)
     time_map_[id] = 0;
+
+  TRACE(TR_LOG,"BernFEBFakeData::ConfigureStart() completed");  
 }
 
-void bernfebdaq::BernFEBFakeData::ConfigureStop(){}
+void bernfebdaq::BernFEBFakeData::ConfigureStop(){
+  TRACE(TR_LOG,"BernFEBFakeData::ConfigureStop() called");  
+  TRACE(TR_LOG,"BernFEBFakeData::ConfigureStop() completed");  
+}
 
 size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
+  TRACE(TR_GD_LOG,"BernFEBFakeData::GetFEBData(0x%lx) called",feb_id);  
 
   usleep(data_wait_time_);
 
@@ -51,8 +62,13 @@ size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
 		    [&](){ return static_cast<uint16_t>((*uniform_distn_)( engine_)); });
     FEBDTPBufferUPtr[i_e] = feb_data;
 
-    std::cout << feb_data << std::endl;
+    TRACE(TR_GD_DEBUG,"\n\tBernFEBFakeData::GetData() : Generated event %s",
+	  feb_data.c_str());
   }
+
+  TRACE(TR_GD_LOG,"BernFEBFakeData::GetFEBData() completed, events=%lu, data_size=%lu",
+	n_events,n_events*sizeof(BernFEBEvent));  
+
   return n_events*sizeof(BernFEBEvent);
 }
 

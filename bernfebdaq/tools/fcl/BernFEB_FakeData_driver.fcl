@@ -29,8 +29,8 @@ fragment_receiver: {
    FEBDequeBufferCapacity: 5e3
    FEBDTPBufferCapacity: 1024
 
-   throttle_usecs: 0
-   throttle_usecs_check: 0
+   throttle_usecs: 2e6
+   throttle_usecs_check: 1e6
 
    random_seed: 314159
    data_wait_time: 5e6
@@ -95,7 +95,7 @@ source:
 module_type: RawInput
 waiting_time: 900
 resume_after_timeout: true
-fragment_type_map: [ [2, "CAEN2795" ] ]
+fragment_type_map: [ [2, "BernFEB" ] ]
 }
 
 process_name: Driver

@@ -5,6 +5,8 @@
 #include "cetlib/exception.h"
 
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 
 // Implementation of "BernFEBFragment", an artdaq::Fragment overlay class
@@ -72,6 +74,8 @@ public:
   void increment(uint32_t missed, uint32_t overwritten, uint32_t events=1, uint32_t d=0)
   { inc_MissedEvents(missed); inc_OverwrittenEvents(overwritten); inc_Events(events); inc_Datagrams(d); }
 
+  const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
+
 private:
 
   int64_t _time_start; //nanoseconds since epoch? or start of run
@@ -109,6 +113,9 @@ struct bernfebdaq::BernFEBEvent{
   uint32_t time1;
   uint32_t time2;
   uint16_t adc[32];
+
+  const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
+
 };
 
 class bernfebdaq::BernFEBFragment {
@@ -128,6 +135,8 @@ class bernfebdaq::BernFEBFragment {
   size_t DataPayloadSize() const { return artdaq_Fragment_.dataSizeBytes(); }
 
   bool Verify() const;
+
+  const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
 
 private:
 

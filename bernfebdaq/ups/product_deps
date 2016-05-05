@@ -19,7 +19,8 @@ fcldir      -
 #
 product		 version	optional
 artdaq           v1_12_13
-bernfebdaq_core    v0_01_00
+TRACE            v3_05_00
+bernfebdaq_core  v0_01_00
 cetbuildtools    v4_14_02        -       only_for_build
 end_product_list
 
@@ -28,15 +29,15 @@ end_product_list
 # s* - see artdaq-core's product_deps
 # -nq- here means there is no qualifier
 # a "-" here means the dependent product is not required by the parent and will not be setup
-qualifier		artdaq	 	 bernfebdaq_core
-e7:eth:prof		e7:s15:eth:prof	 e7:s15:prof
-e7:eth:debug		e7:s15:eth:debug e7:s15:debug
-e7:ib:prof		e7:s15:ib:prof	 e7:s15:prof
-e7:ib:debug		e7:s15:ib:debug e7:s15:debug
-e6:eth:prof		e6:s8:eth:prof	 e6:s8:prof
-e6:eth:debug		e6:s8:eth:debug	 e6:s8:debug
-e6:ib:prof		e6:s8:ib:prof	 e6:s8:prof
-e6:ib:debug		e6:s8:ib:debug	 e6:s8:debug
+qualifier		artdaq	 	 TRACE  bernfebdaq_core
+e7:eth:prof		e7:s15:eth:prof	 e7	e7:s15:prof
+e7:eth:debug		e7:s15:eth:debug e7	e7:s15:debug
+e7:ib:prof		e7:s15:ib:prof	 e7	e7:s15:prof
+e7:ib:debug		e7:s15:ib:debug  e7	e7:s15:debug
+e6:eth:prof		e6:s8:eth:prof	 e6	e6:s8:prof
+e6:eth:debug		e6:s8:eth:debug	 e6	e6:s8:debug
+e6:ib:prof		e6:s8:ib:prof	 e6	e6:s8:prof
+e6:ib:debug		e6:s8:ib:debug	 e6	e6:s8:debug
 end_qualifier_list
 
 # Preserve tabs and formatting in emacs and vi / vim:
