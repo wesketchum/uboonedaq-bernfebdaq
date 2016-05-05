@@ -148,7 +148,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 				   feb.next_time_start+SequenceTimeWindowSize_,
 				   RunNumber_,
 				   feb.next_time_start/SubrunTimeWindowSize_,
-				   feb.next_time_start/SequenceTimeWindowSize_,
+				   feb.next_time_start/SequenceTimeWindowSize_ + 1,
 				   feb_id, ReaderID_,
 				   nChannels_,nADCBits_);
   TRACE(TR_FF_DEBUG,
@@ -193,7 +193,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
   //didn't get our last event in this time window ... return
   if(!clear_buffer && !found_fragment){
-    TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() completed, buffer not empty, but waiting for more data.");
+    TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer not empty, but waiting for more data.");
     return false;
   }
 
@@ -229,7 +229,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   //great, now add the fragment on the end.
   frags.emplace_back( artdaq::Fragment::FragmentBytes(metadata.n_events()*sizeof(BernFEBEvent),  
 						      metadata.sequence_number(),ReaderID_,
-						      bernfebdaq::detail::FragmentType::BernFEB, metadata_) );
+						      bernfebdaq::detail::FragmentType::BernFEB, metadata) );
   std::copy(it_start_fragment,it_end_fragment,(BernFEBEvent*)(frags.back()->dataBegin()));
 
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Fragment created. First event in fragment: %s",
@@ -274,6 +274,9 @@ bool bernfebdaq::BernFEB_GeneratorBase::getNext_(artdaq::FragmentPtrs & frags) {
   }
 
   TRACE(TR_FF_LOG,"BernFeb::getNext_(frags) completed");
+
+  //BernFEBFragment bb(*frags.back());
+  if(frags.size()!=0) TRACE(TR_FF_DEBUG,"BernFEB::geNext_() : last fragment is: %s",(BernFEBFragment(*frags.back())).c_str());
 
   return true;
 

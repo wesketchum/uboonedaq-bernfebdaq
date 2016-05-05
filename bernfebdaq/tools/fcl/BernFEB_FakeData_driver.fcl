@@ -40,10 +40,10 @@ fragment_receiver: {
 
 event_builder: {
 
-  expected_fragments_per_event: 5
+  expected_fragments_per_event: 1
   use_art: true
-  print_event_store_stats: false
-  verbose: false
+  print_event_store_stats: true
+  verbose: true
   events_expected_in_SimpleQueueReader: @local::events_to_generate
 }
 
@@ -69,8 +69,8 @@ physics:
   a1: [ dump ]
   p1: [ ]
   e1: [ out1, rootout ]
-  end_paths: [ e1, a1 ]
-  #end_paths: [ e1 ]
+  #end_paths: [ e1, a1 ]
+  end_paths: [ a1 ]
 }
 
 outputs:
