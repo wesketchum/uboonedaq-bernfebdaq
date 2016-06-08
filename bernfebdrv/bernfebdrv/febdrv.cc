@@ -16,59 +16,91 @@
 #include <sys/timeb.h>
 
 #include "febdrv.h"
-#include "febevt.h"
 #include <curl/curl.h>
 
-#define EVSPERFEB 1024   // max events per feb per poll to buffer
-#define NBUFS 2   // number of buffers for double-buffering
+#include <functional>
 
 CURL *curl;
-  CURLcode res;
+CURLcode res;
 
+int FEBDRV::evnum[NBUFS]; //number of good events in the buffer fields
+int FEBDRV::evbufstat[NBUFS]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out   
 
-void *context = NULL;
+FEBDRV::FEBDRV(char* iface) : 
+  GLOB_daqon(0),
+  nclients(0),
+  sockfd_w(-1), 
+  sockfd_r(-1),
+  driver_state(DRV_OK),
+  dstmac{0x00,0x60,0x37,0x12,0x34,0x00}, //base mac for FEBs, last byte 0->255
+  brcmac{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF},
+  overwritten(0),
+  lostinfpga(0),
+  total_lost(0),
+  total_acquired(0)
+{
 
-//  Socket to respond to clients
-void *responder = NULL;
-//  Socket to send data to clients
-void *publisher = NULL;
-//  Socket to send statistics to clients
-void *pubstats = NULL;
-void *pubstats2 = NULL;
+  int rv;  
+  memset(evbuf,0, sizeof(evbuf));
+  memset(evnum,0, sizeof(evnum));
+  memset(evbufstat,0, sizeof(evbufstat));
+  
+  memset(FEB_configured,0,256);
+  memset(FEB_daqon,0,256);
+  memset(FEB_evrate,0,256);
+  memset(FEB_biason,0,256);
+  memset(FEB_present,0,256);
+  memset(FEB_lastheard,0,256); //number of seconds since the board is heard
+  memset(FEB_VCXO,0,256);
+  // network interface to febs
+  rv=initif(iface);
+  if(rv==0) {printdate(); printf("Can't initialize network interface %s! Exiting.\n",iface);}
+  context = zmq_ctx_new();
+  
+  //  Socket to respond to clients
+  responder = zmq_socket (context, ZMQ_REP);
+  rv=zmq_bind (responder, "tcp://*:5555");
+  if(rv<0) {printdate(); printf("Can't bind tcp socket for command! Exiting.\n");}
+  rv=zmq_bind (responder, "ipc://command");
+  if(rv<0) {printdate(); printf("Can't bind ipc socket for command! Exiting.\n");}
+  printdate(); printf ("febdrv: listening at tcp://5555\n");
+  printdate(); printf ("febdrv: listening at ipc://command\n");
+  
+  //  Socket to send data to clients
+  publisher = zmq_socket (context, ZMQ_PUB);
+  rv = zmq_bind (publisher, "tcp://*:5556");
+  if(rv<0) {printdate(); printf("Can't bind tcp socket for data! Exiting.\n");}
+  rv = zmq_bind (publisher, "ipc://data");
+  if(rv<0) {printdate(); printf("Can't bind ipc socket for data! Exiting.\n");}
+  printdate(); printf ("febdrv: data publisher at tcp://5556\n");
+  printdate(); printf ("febdrv: data publisher at ipc://data\n");
+  
+  //  Socket to send statistics to clients
+  pubstats = zmq_socket (context, ZMQ_PUB);
+  rv = zmq_bind (pubstats, "tcp://*:5557");
+  if(rv<0) {printdate(); printf("Can't bind tcp socket for stats! Exiting.\n");}
+  rv = zmq_bind (pubstats, "ipc://stats");
+  if(rv<0) {printdate(); printf("Can't bind ipc socket for stats! Exiting.\n");}
+  printdate(); printf ("febdrv: stats publisher at tcp://5557\n");
+  printdate(); printf ("febdrv: stats publisher at ipc://stats\n");
+  
+  //  Socket to send binary packed statistics to clients
+  pubstats2 = zmq_socket (context, ZMQ_PUB);
+  rv = zmq_bind (pubstats2, "tcp://*:5558");
+  if(rv<0) {printdate(); printf("Can't bind tcp socket for stats2! Exiting.\n");}
+  rv = zmq_bind (pubstats2, "ipc://stats2");
+  if(rv<0) {printdate(); printf("Can't bind ipc socket for stats2! Exiting.\n");}
+  printdate(); printf ("febdrv: stats2 publisher at tcp://5558\n");
+  printdate(); printf ("febdrv: stats2 publisher at ipc://stats2\n");
+  
+  //initialising FEB daisy chain
+  //scanclients();
+  pingclients();
+  
+  driver_state=DRV_OK;
+}
 
-FEBDTP_PKT_t spkt,rpkt; //send and receive packets
-EVENT_t evbuf[NBUFS][256*EVSPERFEB+1]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
-int evnum[NBUFS]; //number of good events in the buffer fields
-int evbufstat[NBUFS]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out   
-int evtsperpoll[256];
-int msperpoll=0;
-int lostperpoll_cpu[256];
-int lostperpoll_fpga[256];
-struct timeb mstime0, mstime1;
-
-
- int nclients=0;
- uint8_t macs[256][6]; //list of detected clients
- char verstr[256][32]; //list of version strings of clients
- uint8_t hostmac[6];
-       char ifName[IFNAMSIZ];
-        //int sockfd;
-	int sockfd_w=-1; 
-	int sockfd_r=-1;
-        struct timeval tv;
-	struct ifreq if_idx;
-	struct ifreq if_mac;
-int driver_state=DRV_OK;
-uint8_t dstmac[6]={0x00,0x60,0x37,0x12,0x34,0x00}; //base mac for FEBs, last byte 0->255
-uint8_t brcmac[6]={0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-
-///////////////Forward declarations
-int startDAQ(uint8_t mac5);
-
-///////////////End Forward declarations
-
-
-void printdate()
+void FEBDRV::printdate()
 {
     char str[64];
     time_t result=time(NULL);
@@ -77,12 +109,12 @@ void printdate()
     printf("%s ", str); 
 }
 
-void printmac( uint8_t *mac)
+void FEBDRV::printmac( uint8_t *mac)
 {
   printf("%02x:%02x:%02x:%02x:%02x:%02x",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 }
 
-uint32_t GrayToBin(uint32_t n)
+uint32_t FEBDRV::GrayToBin(uint32_t n)
 {
 uint32_t res=0;
  int a[32],b[32],i=0;//,c=0;
@@ -98,7 +130,7 @@ res=(res | b[i]); }
 }
 
 
-void ConfigSetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index, bool value)
+void FEBDRV::ConfigSetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index, bool value)
 {
   uint8_t byte;
   uint8_t mask;
@@ -109,7 +141,7 @@ void ConfigSetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index, bool val
   buffer[(bitlen-1-bit_index)/8]=byte;
 }
 
-bool ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index)
+bool FEBDRV::ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index)
 {
   uint8_t byte;
   uint8_t mask;
@@ -120,9 +152,9 @@ bool ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index)
 }
 
 
-int initif(char *iface)
+int FEBDRV::initif(char *iface)
 {
-        spkt.iptype=0x0108; // IP type 0x0801
+  //spkt.iptype=0x0108; // IP type 0x0801
 	tv.tv_sec = 0;  /* 0 Secs Timeout */
 	tv.tv_usec = 500000;  // 500ms
         sprintf(ifName,"%s",iface); 
@@ -133,7 +165,8 @@ int initif(char *iface)
             return 0;
 	}
 	/* Open PF_PACKET socket, listening for EtherType ETHER_TYPE */
-	if ((sockfd_r = socket(PF_PACKET, SOCK_RAW, spkt.iptype)) == -1) {
+	//	if ((sockfd_r = socket(PF_PACKET, SOCK_RAW, spkt.iptype)) == -1) {
+	if ((sockfd_r = socket(PF_PACKET, SOCK_RAW, 0x0108)) == -1) {
 		perror("listener: socket");	
 		return 0;
 	}
@@ -159,7 +192,6 @@ int initif(char *iface)
 	if (ioctl(sockfd_w, SIOCGIFHWADDR, &if_mac) < 0)
 	    {perror("SIOCGIFHWADDR"); return 0;}
         memcpy(&hostmac,((uint8_t *)&if_mac.ifr_hwaddr.sa_data),6);
-        memcpy(&(spkt.src_mac),hostmac,6);
         printdate(); printf("febdrv: initialized %s with MAC  ", ifName);
         printmac(hostmac);
         printf("\n");
@@ -167,7 +199,7 @@ int initif(char *iface)
 }
 
 
-int sendtofeb(int len)  //sending spkt
+int FEBDRV::sendtofeb(int len, FEBDTP_PKT_t const& spkt)  //sending spkt
 {
 	struct ifreq if_idx;
 	struct ifreq if_mac;
@@ -199,7 +231,7 @@ int sendtofeb(int len)  //sending spkt
         return 1; 
 }
 
-int recvfromfeb(int timeout_us) //result is in rpkt
+int FEBDRV::recvfromfeb(int timeout_us, FEBDTP_PKT_t & rcvrpkt) //result is in rpkt
 {
 	int numbytes;
             // set receive timeout
@@ -208,73 +240,71 @@ int recvfromfeb(int timeout_us) //result is in rpkt
 		perror("SO_SETTIMEOUT");
 		return 0;
 	}
- 	numbytes = recvfrom(sockfd_r, &rpkt, MAXPACKLEN, 0, NULL, NULL);
+ 	numbytes = recvfrom(sockfd_r, &rcvrpkt, MAXPACKLEN, 0, NULL, NULL);
         if(numbytes<=0) {driver_state=DRV_RECVERROR; return 0;} //timeout
 	//printf("feb->host: received packet %d bytes from  %02x:%02x:%02x:%02x:%02x:%02x.\n", numbytes,rpkt.src_mac[0],rpkt.src_mac[1],rpkt.src_mac[2],rpkt.src_mac[3],rpkt.src_mac[4],rpkt.src_mac[5]);
-        FEB_lastheard[rpkt.src_mac[5]]=time(NULL);
+        FEB_lastheard[rcvrpkt.src_mac[5]]=time(NULL);
         return numbytes;
 }
 
-int flushlink()
+int FEBDRV::flushlink()
 {
           // set short timeout and Flush input buffer 
-      while(recvfromfeb(1000)>0) {}
+  while(recvfromfeb(1000,rpkt)>0) {}
       driver_state=DRV_OK; 
       return 1;
 }
 
-int sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf)
+int FEBDRV::sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf)
 {
+
+  FEBDTP_PKT_t spkt;
   //int numbytes=1;
   //int retval=0;
-        int packlen=64;
-        //int tout=50000;
-        memcpy(&spkt.dst_mac,mac,6);        
-        memcpy(&spkt.CMD,&cmd,2);
-        memcpy(&spkt.REG,&reg,2);
-        switch (cmd) {
-                case FEB_GET_RATE :
- 		case FEB_GEN_INIT : 
-  		case FEB_GEN_HVON : 
-  		case FEB_GEN_HVOF : 
-   			break;
-  		case FEB_SET_RECV : 
-    			memcpy(&spkt.Data,buf,6); // Copy source mac to the data buffer
-   			break;
-  		case FEB_WR_SR : 
-    			memcpy(&spkt.Data,buf,1); // Copy register value to the data buffer 
-   			break;
-  		case FEB_WR_SRFF : 
-  		case FEB_WR_SCR  : 
-  		case FEB_WR_PMR  : 
-  		case FEB_WR_CDR : 
-     			memcpy(&spkt.Data,buf,256); // Copy 256 register values to the data buffer
-     			packlen=256+18; 
-    			break;
-  		case FEB_RD_CDR : 
-    			break;
-   		case FEB_RD_FW : 
-  		case FEB_WR_FW : 
-     			memcpy(&spkt.Data,buf,5); // Copy address and numblocks
-    			break;
- 		case FEB_DATA_FW : 
-     			memcpy(&spkt.Data,buf,1024); // Copy 1kB  data buffer
-			packlen=1024+18;
-    			break;	  
-	}
-        flushlink();
-        packlen=sendtofeb(packlen);
-        if(packlen<=0) return 0; 
-	return packlen;
+  int packlen=64;
+  //int tout=50000;
+  memcpy(&spkt.dst_mac,mac,6);        
+  memcpy(&spkt.src_mac,hostmac,6);
+  spkt.iptype = 0x0108;
+  memcpy(&spkt.CMD,&cmd,2);
+  memcpy(&spkt.REG,&reg,2);
+  switch (cmd) {
+  case FEB_GET_RATE :
+  case FEB_GEN_INIT : 
+  case FEB_GEN_HVON : 
+  case FEB_GEN_HVOF : 
+    break;
+  case FEB_SET_RECV : 
+    memcpy(&spkt.Data,buf,6); // Copy source mac to the data buffer
+    break;
+  case FEB_WR_SR : 
+    memcpy(&spkt.Data,buf,1); // Copy register value to the data buffer 
+    break;
+  case FEB_WR_SRFF : 
+  case FEB_WR_SCR  : 
+  case FEB_WR_PMR  : 
+  case FEB_WR_CDR : 
+    memcpy(&spkt.Data,buf,256); // Copy 256 register values to the data buffer
+    packlen=256+18; 
+    break;
+  case FEB_RD_CDR : 
+    break;
+  case FEB_RD_FW : 
+  case FEB_WR_FW : 
+    memcpy(&spkt.Data,buf,5); // Copy address and numblocks
+    break;
+  case FEB_DATA_FW : 
+    memcpy(&spkt.Data,buf,1024); // Copy 1kB  data buffer
+    packlen=1024+18;
+    break;	  
+  }
+  flushlink();
+  packlen=sendtofeb(packlen,spkt);
+  if(packlen<=0) return 0; 
+  return packlen;
 }
 
-void usage()
-{
- printf("Usage: to init febdrv on eth0 interface type \n");
- printf("febdrv eth0\n");
-}
-
-int pingclients()
+int FEBDRV::pingclients()
 {
  if(GLOB_daqon!=0) return 0; //ping only allowed when DAQ is off
  nclients=0;
@@ -285,7 +315,7 @@ int pingclients()
   dstmac[5]=0xff; 
   sendcommand(dstmac,FEB_SET_RECV,FEB_VCXO[nclients],hostmac);
   
-  while(recvfromfeb(10000)) if(rpkt.CMD==FEB_OK) 
+  while(recvfromfeb(10000,rpkt)) if(rpkt.CMD==FEB_OK) 
   {
       memcpy(macs[nclients],rpkt.src_mac,6);
       febs[macs[nclients][5]]=1;
@@ -315,7 +345,7 @@ int pingclients()
   return nclients;
 }
 
-int sendconfig(uint8_t mac5)
+int FEBDRV::sendconfig(uint8_t mac5)
 {
 //t->SendCMD(t->dstmac,FEB_SET_RECV,fNumberEntry75->GetNumber(),t->srcmac);
   int nreplies=0;
@@ -323,7 +353,7 @@ int sendconfig(uint8_t mac5)
 dstmac[5]=mac5;
 FEB_configured[mac5]=0;
 sendcommand(dstmac,FEB_WR_SCR,0x0000,bufSCR[mac5]);
-  while(recvfromfeb(50000)) { 
+ while(recvfromfeb(50000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK_SCR) return 0;
   nreplies++;
   }
@@ -331,8 +361,8 @@ sendcommand(dstmac,FEB_WR_SCR,0x0000,bufSCR[mac5]);
   if(nreplies!=nclients && mac5==255) return 0;
 
 sendcommand(dstmac,FEB_WR_PMR,0x0000,bufPMR[mac5]);
-if(!recvfromfeb(50000))  return 0;
-  while(recvfromfeb(50000)) { 
+ if(!recvfromfeb(50000,rpkt))  return 0;
+ while(recvfromfeb(50000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK_PMR) return 0;
   nreplies++;
   }
@@ -345,13 +375,13 @@ return 1;
 }
 
 
-int stopDAQ(uint8_t)// mac5)
+int FEBDRV::stopDAQ(uint8_t)// mac5)
 {
   GLOB_daqon=0;
   return 1;
 }
 
-int startDAQ(uint8_t mac5)
+int FEBDRV::startDAQ(uint8_t mac5)
 {
   int nreplies=0;
   dstmac[5]=mac5; 
@@ -363,7 +393,7 @@ memset(evbufstat,0, sizeof(evbufstat));
   nreplies=0;
   sendcommand(dstmac,FEB_GEN_INIT,0,buf); //stop DAQ on the FEB
   
-  while(recvfromfeb(10000)) { 
+  while(recvfromfeb(10000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK) return 0;
   nreplies++;
   }
@@ -373,7 +403,7 @@ memset(evbufstat,0, sizeof(evbufstat));
   nreplies=0;
   sendcommand(dstmac,FEB_GEN_INIT,1,buf); //reset buffer
   
-  while(recvfromfeb(10000)) { 
+  while(recvfromfeb(10000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK) return 0;
   nreplies++;
   }
@@ -382,7 +412,7 @@ memset(evbufstat,0, sizeof(evbufstat));
 
   nreplies=0;
   sendcommand(dstmac,FEB_GEN_INIT,2,buf); //set DAQ_Enable flag on FEB
-  while(recvfromfeb(10000)) { 
+  while(recvfromfeb(10000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK) return 0;
   FEB_daqon[rpkt.src_mac[5]]=1;
   nreplies++;
@@ -394,13 +424,13 @@ memset(evbufstat,0, sizeof(evbufstat));
 }
 
 
-int biasON(uint8_t mac5)
+int FEBDRV::biasON(uint8_t mac5)
 {
   int nreplies=0;
   dstmac[5]=mac5; 
   sendcommand(dstmac,FEB_GEN_HVON,0,buf); //reset buffer
   
-  while(recvfromfeb(10000)) { 
+  while(recvfromfeb(10000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK) return 0;
   nreplies++;
   FEB_biason[rpkt.src_mac[5]]=1;
@@ -411,13 +441,13 @@ int biasON(uint8_t mac5)
   return 1;
 
 }
-int biasOFF(uint8_t mac5)
+int FEBDRV::biasOFF(uint8_t mac5)
 {
   int nreplies=0;
   dstmac[5]=mac5; 
   sendcommand(dstmac,FEB_GEN_HVOF,0,buf); //reset buffer
   
-  while(recvfromfeb(10000)) { 
+  while(recvfromfeb(10000,rpkt)) { 
   if(rpkt.CMD!=FEB_OK) return 0;
   nreplies++;
   FEB_biason[rpkt.src_mac[5]]=0;
@@ -427,7 +457,7 @@ int biasOFF(uint8_t mac5)
   return 1;
 }
 
-int configu(uint8_t mac5, uint8_t *buf1, int len)
+int FEBDRV::configu(uint8_t mac5, uint8_t *buf1, int len)
 {
 int rv=1;
 //printf("called configu(%02x,buf,%d)\n",mac5,len);
@@ -439,7 +469,7 @@ memcpy(bufPMR[mac5],buf1+1144/8,224/8);
  return rv;
 }
 
-int getSCR(uint8_t mac5, uint8_t *buf1)
+int FEBDRV::getSCR(uint8_t mac5, uint8_t *buf1)
 {
 int rv=1;
 memcpy(buf1,bufSCR[mac5],1144/8);
@@ -447,57 +477,49 @@ return rv;
 }
 
 
-EVENT_t * getnextevent() //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out  
+EVENT_t * FEBDRV::getnextevent() //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out  
 {
-EVENT_t * retval=0;
-//EVENT_t evbuf[2][256*EVSPERFEB]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
-//int evnum[2]; //number of good events in the buffer fields
-//int evbufstat[2]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= ready, 3=being sent out   
-int sbi=0;
-// check for available buffers
-for(sbi=0;sbi<NBUFS;sbi++) if(evbufstat[sbi]==1)  ///check for buffer being filled
-    {
-           retval=&(evbuf[sbi][evnum[sbi]]); 
-           evnum[sbi]++; 
-           if(evnum[sbi]==EVSPERFEB*256)  evbufstat[sbi]=2; //buffer full, set to ready
-     //      printf("%d",sbi);
-           return retval;
-    } //found buffer being filled, return pointer
-for(sbi=0;sbi<NBUFS;sbi++) if(evbufstat[sbi]==0) ///check for empty buffer
-    {
-           retval=&(evbuf[sbi][0]); 
-           evnum[sbi]=1; 
-           evbufstat[sbi]=1; //buffer being filled
-   //        printf("%d",sbi);
-           return retval;
-    } //started new buffer, return pointer
-//if we get here, than no buffers are available!
-return 0;
+  EVENT_t * retval=0;
+  //EVENT_t evbuf[2][256*EVSPERFEB]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
+  //int evnum[2]; //number of good events in the buffer fields
+  //int evbufstat[2]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= ready, 3=being sent out   
+  int sbi=0;
+  // check for available buffers
+  for(sbi=0;sbi<NBUFS;sbi++) if(evbufstat[sbi]==1)  ///check for buffer being filled
+			       {
+				 retval=&(evbuf[sbi][evnum[sbi]]); 
+				 evnum[sbi]++; 
+				 if(evnum[sbi]==EVSPERFEB*256)  evbufstat[sbi]=2; //buffer full, set to ready
+				 //      printf("%d",sbi);
+				 return retval;
+			       } //found buffer being filled, return pointer
+  for(sbi=0;sbi<NBUFS;sbi++) if(evbufstat[sbi]==0) ///check for empty buffer
+			       {
+				 retval=&(evbuf[sbi][0]); 
+				 evnum[sbi]=1; 
+				 evbufstat[sbi]=1; //buffer being filled
+				 //        printf("%d",sbi);
+				 return retval;
+			       } //started new buffer, return pointer
+  //if we get here, than no buffers are available!
+  return 0;
 }
 
-
-uint32_t ts0_ref_MEM[256];
-uint32_t ts1_ref_MEM[256];
-
-uint32_t overwritten=0;
-uint32_t lostinfpga=0;
-uint32_t total_lost=0;
-uint32_t total_acquired=0;
 
 //void free_subbufer (void *data, void *hint) //call back from ZMQ sent function, hint points to subbufer index
-void free_subbufer (void*, void *hint) //call back from ZMQ sent function, hint points to subbufer index
+void FEBDRV::free_subbufer (void*, void *hint) //call back from ZMQ sent function, hint points to subbufer index
 {
- //return;
- int sbi;
- sbi =  (intptr_t)hint; //reset buffer status to empty
- evbufstat[sbi]=0;
- evnum[sbi]=0; 
-// printf("Subbuf %d transmission complete.\n",sbi);
-
+  //return;
+  int sbi;
+  sbi =  (intptr_t)hint; //reset buffer status to empty
+  evbufstat[sbi]=0;
+  evnum[sbi]=0; 
+  // printf("Subbuf %d transmission complete.\n",sbi);
+  
 }
 
 
-int senddata()
+int FEBDRV::senddata()
 {
 int sbi=0;
 void* bptr=0;
@@ -531,7 +553,7 @@ zmq_msg_close (&msg);
 }
 
 
-int sendstats2() //send statistics in binary packet format
+int FEBDRV::sendstats2() //send statistics in binary packet format
 {
 // float Rate;
  void* ptr;
@@ -553,7 +575,7 @@ for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
    sendcommand(macs[f],FEB_GET_RATE,0,buf);
   memset(&fs,0,sizeof(fs));
   fs.connected=1;
-  if(recvfromfeb(10000)==0) fs.connected=0;  
+  if(recvfromfeb(10000,rpkt)==0) fs.connected=0;  
 //   sprintf(str+strlen(str), "Timeout for FEB %02x:%02x:%02x:%02x:%02x:%02x !\n",macs[f][0],macs[f][1],macs[f][2],macs[f][3],macs[f][4],macs[f][5]);
   if(rpkt.CMD!=FEB_OK)   fs.error=1;  
  //  sprintf(str+strlen(str), "no FEB_OK for FEB %02x:%02x:%02x:%02x:%02x:%02x !\n",macs[f][0],macs[f][1],macs[f][2],macs[f][3],macs[f][4],macs[f][5]);
@@ -591,7 +613,7 @@ zmq_msg_close (&msg);
  
 }
 
-int sendstats()
+int FEBDRV::sendstats()
 {
  char str[2048]; //stats string
  float Rate;
@@ -606,7 +628,7 @@ int sendstats()
 for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
  {
    sendcommand(macs[f],FEB_GET_RATE,0,buf); 
-  if(recvfromfeb(10000)==0) 
+   if(recvfromfeb(10000,rpkt)==0) 
    sprintf(str+strlen(str), "Timeout for FEB %02x:%02x:%02x:%02x:%02x:%02x !\n",macs[f][0],macs[f][1],macs[f][2],macs[f][3],macs[f][4],macs[f][5]);
   if(rpkt.CMD!=FEB_OK)    
    sprintf(str+strlen(str), "no FEB_OK for FEB %02x:%02x:%02x:%02x:%02x:%02x !\n",macs[f][0],macs[f][1],macs[f][2],macs[f][3],macs[f][4],macs[f][5]);
@@ -638,11 +660,7 @@ zmq_msg_close (&msg);
  
 }
 
-
-
-
-
-int polldata() // poll data from daysy-chain and send it to the publisher socket
+int FEBDRV::polldata() // poll data from daysy-chain and send it to the publisher socket
 {  
 bool NOts0,NOts1;
 bool REFEVTts0,REFEVTts1;
@@ -676,7 +694,7 @@ for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
      rpkt.CMD=0; //just to start somehow
      while(numbytes>0 && rpkt.CMD!=FEB_EOF_CDR) //loop on messages from one FEB
      { 
-       numbytes=recvfromfeb(5000);
+       numbytes=recvfromfeb(5000,rpkt);
        if(numbytes==0) continue;       
        if(rpkt.CMD!=FEB_DATA_CDR) continue; //should not happen, but just in case..
         datalen=numbytes-18;
@@ -687,14 +705,18 @@ for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
          {
         //printf(" Remaining events: %d\n",(t->gpkt).REG);
         //printf("Flags: 0x%08x ",*(UInt_t*)(&(t->gpkt).Data[jj]));
-        overwritten=*(uint16_t*)(&(rpkt).Data[jj]); 
-	jj=jj+2;
-        lostinfpga=*(uint16_t*)(&(rpkt).Data[jj]); 
+	   auto ovrwr_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+	   overwritten=*ovrwr_ptr;
+	   jj=jj+2;
+	   auto lif_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+	   lostinfpga=*lif_ptr;
 	jj=jj+2;
         total_lost+=lostinfpga;
         lostperpoll_fpga[rpkt.src_mac[5]]+=lostinfpga;
-        ts0=*(uint32_t*)(&(rpkt).Data[jj]); jj=jj+4; 
-        ts1=*(uint32_t*)(&(rpkt).Data[jj]); jj=jj+4; 
+	auto ts0_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
+        ts0=*ts0_ptr; jj=jj+4; 
+	auto ts1_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
+        ts1=*ts1_ptr; jj=jj+4; 
 //	printf("T0=%u ns, T1=%u ns \n",ts0,ts1);
         ls2b0=ts0 & 0x00000003;
         ls2b1=ts1 & 0x00000003;
@@ -751,7 +773,12 @@ for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
         if(NOts1==0) evt->flags|=0x0002;        
         if(REFEVTts0==1) evt->flags|=0x0004; //bit indicating TS0 reference event        
         if(REFEVTts1==1) evt->flags|=0x0008; //bit indicating TS1 reference event        
-        for(int kk=0; kk<32; kk++) { evt->adc[kk]=*(uint16_t*)(&(rpkt).Data[jj]); jj++; jj++;}  
+        for(int kk=0; kk<32; kk++) { 
+	  auto adc_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+	  evt->adc[kk]=*adc_ptr; 
+	  jj++; 
+	  jj++;
+	}  
         total_acquired++;
         evtsperpoll[rpkt.src_mac[5]]++;
         }   //loop on event buffer in one L2 packet     
@@ -767,115 +794,85 @@ return rv;
 }
 
 
+void usage()
+{
+  printf("Usage: to init febdrv on eth0 interface type \n");
+  printf("febdrv eth0\n");
+}
+
 int main (int argc, char **argv)
 {
+  
+  
+  if(argc!=2) { usage(); return 0;}
+
+  FEBDRV febdrv(argv[1]);
+  
+  zmq_msg_t request;
+  char cmd[32]; //command string
+  
 
 
-int rv;
-char cmd[32]; //command string
-if(argc!=2) { usage(); return 0;}
+  while (1) {  // main loop
 
-memset(evbuf,0, sizeof(evbuf));
-memset(evnum,0, sizeof(evnum));
-memset(evbufstat,0, sizeof(evbufstat));
+    febdrv.pingclients();
+    febdrv.SetDriverState(DRV_OK);
 
-memset(FEB_configured,0,256);
-memset(FEB_daqon,0,256);
-memset(FEB_evrate,0,256);
-memset(FEB_biason,0,256);
-memset(FEB_present,0,256);
-memset(FEB_lastheard,0,256); //number of seconds since the board is heard
-memset(FEB_VCXO,0,256);
-// network interface to febs
-rv=initif(argv[1]);
-if(rv==0) {printdate(); printf("Can't initialize network interface %s! Exiting.\n",argv[1]); return 0;}
-context = zmq_ctx_new();
+    //Check next request from client
+    zmq_msg_init (&request);
 
-//  Socket to respond to clients
-responder = zmq_socket (context, ZMQ_REP);
-rv=zmq_bind (responder, "tcp://*:5555");
-if(rv<0) {printdate(); printf("Can't bind tcp socket for command! Exiting.\n"); return 0;}
-rv=zmq_bind (responder, "ipc://command");
-if(rv<0) {printdate(); printf("Can't bind ipc socket for command! Exiting.\n"); return 0;}
-printdate(); printf ("febdrv: listening at tcp://5555\n");
-printdate(); printf ("febdrv: listening at ipc://command\n");
+    if(zmq_msg_recv (&request, febdrv.GetResponder(), ZMQ_DONTWAIT)==-1) {
+      zmq_msg_close (&request);  
+      febdrv.polldata(); 
+      febdrv.senddata(); 
+      febdrv.sendstats(); 
+      febdrv.sendstats2(); 
+      continue;
+    } 
+    sprintf(cmd,"%s",(char*)zmq_msg_data(&request));
+    febdrv.printdate();
+    printf ("Received Command %s %02x  ",cmd, *(uint8_t*)((char*)(zmq_msg_data(&request))+8) );
 
-//  Socket to send data to clients
-publisher = zmq_socket (context, ZMQ_PUB);
-rv = zmq_bind (publisher, "tcp://*:5556");
-if(rv<0) {printdate(); printf("Can't bind tcp socket for data! Exiting.\n"); return 0;}
-rv = zmq_bind (publisher, "ipc://data");
-if(rv<0) {printdate(); printf("Can't bind ipc socket for data! Exiting.\n"); return 0;}
-printdate(); printf ("febdrv: data publisher at tcp://5556\n");
-printdate(); printf ("febdrv: data publisher at ipc://data\n");
+    int rv=0;
+    if(febdrv.NClients()>0)
+      {
+	if(strcmp(cmd, "BIAS_ON")==0) 
+	  rv=febdrv.biasON(*(uint8_t*)((char*)(zmq_msg_data(&request))+8)); //get 8-th byte of message - mac of target board
+	else if (strcmp(cmd, "BIAS_OF")==0) 
+	  rv=febdrv.biasOFF(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
+	else if (strcmp(cmd, "DAQ_BEG")==0) 
+	  rv=febdrv.startDAQ(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
+	else if (strcmp(cmd, "DAQ_END")==0) 
+	  rv=febdrv.stopDAQ(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
+	else if (strcmp(cmd, "SETCONF")==0) 
+	  rv=febdrv.configu(*(uint8_t*)((char*)(zmq_msg_data(&request))+8), (uint8_t*)((char*)(zmq_msg_data(&request))+9), zmq_msg_size(&request)-9); 
+	else if (strcmp(cmd, "GET_SCR")==0) 
+	  rv=febdrv.getSCR(*(uint8_t*)((char*)(zmq_msg_data(&request))+8),buf); 
+      }
 
-//  Socket to send statistics to clients
-pubstats = zmq_socket (context, ZMQ_PUB);
-rv = zmq_bind (pubstats, "tcp://*:5557");
-if(rv<0) {printdate(); printf("Can't bind tcp socket for stats! Exiting.\n"); return 0;}
-rv = zmq_bind (pubstats, "ipc://stats");
-if(rv<0) {printdate(); printf("Can't bind ipc socket for stats! Exiting.\n"); return 0;}
-printdate(); printf ("febdrv: stats publisher at tcp://5557\n");
-printdate(); printf ("febdrv: stats publisher at ipc://stats\n");
-
-//  Socket to send binary packed statistics to clients
-pubstats2 = zmq_socket (context, ZMQ_PUB);
-rv = zmq_bind (pubstats2, "tcp://*:5558");
-if(rv<0) {printdate(); printf("Can't bind tcp socket for stats2! Exiting.\n"); return 0;}
-rv = zmq_bind (pubstats2, "ipc://stats2");
-if(rv<0) {printdate(); printf("Can't bind ipc socket for stats2! Exiting.\n"); return 0;}
-printdate(); printf ("febdrv: stats2 publisher at tcp://5558\n");
-printdate(); printf ("febdrv: stats2 publisher at ipc://stats2\n");
-
-//initialising FEB daisy chain
-//scanclients();
-pingclients();
-
-driver_state=DRV_OK;
-
-zmq_msg_t request;
-
-while (1) {  // main loop
-pingclients();
-driver_state=DRV_OK;
-//Check next request from client
-zmq_msg_init (&request);
-//if(zmq_msg_recv (&request, responder, ZMQ_DONTWAIT)==-1) {zmq_msg_close (&request);  polldata(); senddata(); sendstats(); sendstats2();sendstats3(); continue;} 
-if(zmq_msg_recv (&request, responder, ZMQ_DONTWAIT)==-1) {zmq_msg_close (&request);  polldata(); senddata(); sendstats(); sendstats2(); continue;} 
-sprintf(cmd,"%s",(char*)zmq_msg_data(&request));
- printdate(); printf ("Received Command %s %02x  ",cmd, *(uint8_t*)((char*)(zmq_msg_data(&request))+8) );
-rv=0;
-if(nclients>0)
- {
-   if(strcmp(cmd, "BIAS_ON")==0) rv=biasON(*(uint8_t*)((char*)(zmq_msg_data(&request))+8)); //get 8-th byte of message - mac of target board
- else if (strcmp(cmd, "BIAS_OF")==0) rv=biasOFF(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
- else if (strcmp(cmd, "DAQ_BEG")==0) rv=startDAQ(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
- else if (strcmp(cmd, "DAQ_END")==0) rv=stopDAQ(*(uint8_t*)((char*)(zmq_msg_data(&request))+8));
- else if (strcmp(cmd, "SETCONF")==0) rv=configu(*(uint8_t*)((char*)(zmq_msg_data(&request))+8), (uint8_t*)((char*)(zmq_msg_data(&request))+9), zmq_msg_size(&request)-9); 
- else if (strcmp(cmd, "GET_SCR")==0) rv=getSCR(*(uint8_t*)((char*)(zmq_msg_data(&request))+8),buf); 
- }
-//  Send reply back to client
-zmq_msg_t reply;
-if (strcmp(cmd, "GET_SCR")==0) 
- {
-  zmq_msg_init_size (&reply, 1144/8);
-  memcpy(zmq_msg_data (&reply),buf,1144/8);
- }
-else
- { 
- zmq_msg_init_size (&reply, 5);
- if(rv>0) sprintf((char*)(zmq_msg_data (&reply)), "OK");
- else sprintf( (char*)(zmq_msg_data (&reply)), "ERR");
- }
-printf("Sending reply %s\n",(char*)zmq_msg_data (&reply));
-zmq_msg_send (&reply, responder, 0);
-zmq_msg_close (&reply);
-
-} //end main loop
+    //  Send reply back to client
+    zmq_msg_t reply;
+    if (strcmp(cmd, "GET_SCR")==0) 
+      {
+	zmq_msg_init_size (&reply, 1144/8);
+	memcpy(zmq_msg_data (&reply),buf,1144/8);
+      }
+    else
+      { 
+	zmq_msg_init_size (&reply, 5);
+	if(rv>0) sprintf((char*)(zmq_msg_data (&reply)), "OK");
+	else sprintf( (char*)(zmq_msg_data (&reply)), "ERR");
+      }
+    printf("Sending reply %s\n",(char*)zmq_msg_data (&reply));
+    zmq_msg_send (&reply, febdrv.GetResponder(), 0);
+    zmq_msg_close (&reply);
 
 
-//  We never get here but if we did, this would be how we end
-zmq_close (responder);
-zmq_ctx_destroy (context);
-return 1;
+  } //end main loop
+
+
+  //  We never get here but if we did, this would be how we end
+  zmq_close (febdrv.GetResponder());
+  zmq_ctx_destroy ( febdrv.GetContext() );
+  return 1;
 }

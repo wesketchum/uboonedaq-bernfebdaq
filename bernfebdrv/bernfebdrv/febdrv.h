@@ -1,4 +1,5 @@
 #include <time.h>
+#include "febevt.h"
 
     // Ethernet switch register r/w
 #define FEB_RD_SR 0x0001
@@ -77,5 +78,106 @@ uint16_t FEB_VCXO[256];
 
 uint8_t buf[MAXPACKLEN];
 
-uint8_t GLOB_daqon=0;
 
+#define EVSPERFEB 1024   // max events per feb per poll to buffer
+#define NBUFS 2   // number of buffers for double-buffering
+
+
+class FEBDRV{
+
+public:
+  FEBDRV(char *iface);
+
+  int startDAQ(uint8_t mac5);
+  int stopDAQ(uint8_t);
+
+  void SetDriverState(int state) { driver_state=state; }
+  int NClients() { return nclients; }
+
+  void printdate();
+  void printmac(uint8_t*);
+
+  void ConfigSetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index, bool value);
+  bool ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index);
+
+  int initif(char *iface);
+
+  int sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf);
+
+  int pingclients();
+
+  int sendconfig(uint8_t mac5);
+
+  int biasON(uint8_t mac5);
+  int biasOFF(uint8_t mac5);
+
+  int configu(uint8_t mac5, uint8_t *buf1, int len);
+  int getSCR(uint8_t mac5, uint8_t *buf1);
+
+  int senddata();
+  int sendstats();
+  int sendstats2();
+  int polldata();
+
+  static void free_subbufer (void*, void *hint); //call back from ZMQ sent function, hint points to subbufer index
+
+  void* GetResponder() { return responder; }
+  void* GetContext() { return context; }
+
+private:
+
+  void *context = NULL;
+  
+  //  Socket to respond to clients
+  void *responder = NULL;
+  //  Socket to send data to clients
+  void *publisher = NULL;
+  //  Socket to send statistics to clients
+  void *pubstats = NULL;
+  void *pubstats2 = NULL;
+  
+  FEBDTP_PKT_t rpkt; //send and receive packets
+  EVENT_t evbuf[NBUFS][256*EVSPERFEB+1]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
+  static int evnum[NBUFS]; //number of good events in the buffer fields
+  static int evbufstat[NBUFS]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out   
+  int evtsperpoll[256];
+  int msperpoll=0;
+  int lostperpoll_cpu[256];
+  int lostperpoll_fpga[256];
+  struct timeb mstime0, mstime1;
+  
+  
+  uint8_t GLOB_daqon;
+  int nclients;
+  uint8_t macs[256][6]; //list of detected clients
+  char verstr[256][32]; //list of version strings of clients
+  uint8_t hostmac[6];
+  char ifName[IFNAMSIZ];
+  //int sockfd;
+  int sockfd_w; 
+  int sockfd_r;
+  struct timeval tv;
+  struct ifreq if_idx;
+  struct ifreq if_mac;
+  int driver_state;
+  uint8_t dstmac[6];
+  uint8_t brcmac[6];
+
+  uint32_t ts0_ref_MEM[256];
+  uint32_t ts1_ref_MEM[256];
+  
+  uint32_t overwritten;
+  uint32_t lostinfpga;
+  uint32_t total_lost;
+  uint32_t total_acquired;
+
+  uint32_t GrayToBin(uint32_t n);
+
+  int sendtofeb(int len, FEBDTP_PKT_t const& spkt);  //sending spkt
+  int recvfromfeb(int timeout_us, FEBDTP_PKT_t & rcvrpkt); //result is in rpkt
+
+  int flushlink();
+
+  EVENT_t * getnextevent();
+
+};
