@@ -13,6 +13,9 @@
 
 namespace bernfebdaq {
 
+  struct BernFEBTimeStamp;
+  std::ostream & operator << (std::ostream &, BernFEBTimeStamp const &);
+
   struct BernFEBEvent;
   std::ostream & operator << (std::ostream &, BernFEBEvent const &);
 
@@ -100,6 +103,33 @@ private:
   
 };
 
+struct bernfebdaq::BernFEBTimeStamp{
+
+  union{
+    struct{
+      uint32_t rawtime : 30;
+      uint32_t overflow : 1;
+      uint32_t reference : 1;
+    } ts;
+    uint32_t rawts;
+  } __attribute__ ((packed));
+
+  uint32_t Time() const{
+    uint32_t temp = (ts.rawtime>>2); //ignore last two bits for now;
+    for(int i=4; i>=0; --i)
+      temp = temp ^ (temp >> (1<<i));
+    return ( (temp << 2) | (ts.rawtime&0x3) );
+  }
+  bool IsOverflow() const{
+    return (ts.overflow==1);
+  }
+  bool IsReference() const{
+    return (ts.reference==1);
+  }
+
+  const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
+};
+
 struct bernfebdaq::BernFEBEvent{    
 
   union{
@@ -110,8 +140,8 @@ struct bernfebdaq::BernFEBEvent{
     uint32_t flags_word;
   } __attribute__ ((packed));
 
-  uint32_t time1;
-  uint32_t time2;
+  BernFEBTimeStamp time1;
+  BernFEBTimeStamp time2;
   uint16_t adc[32];
 
   const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }

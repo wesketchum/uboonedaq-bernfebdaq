@@ -31,12 +31,20 @@ std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBFragmentMetada
   return os;
 }
 
+std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBTimeStamp const & ts){
+  os << "\nBernFEBTimeStamp: 0x" << std::hex << ts.rawts << std::dec;
+  os << "\n\tIsReference?      " << ts.IsReference();
+  os << "\n\tIsOverflow?       " << ts.IsOverflow();
+  os << "\n\tTime (corrected): " << ts.Time();
+  return os;
+}
+
 std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBEvent const & e){
   os << "\nBernFEBEvent"
      << "\n\tOverwritten events, Missed events: " 
-     << e.flags.overwritten << ", " << e.flags.missed << ", " << std::hex << "(0x" << e.flags_word << std::dec << ")"
-     << "\n\tTime1: " << e.time1 << "(" << std::hex << e.time1 << ")" << std::dec
-     << "\n\tTime2: " << e.time2 << "(" << std::hex << e.time2 << ")" << std::dec;
+     << e.flags.overwritten << ", " << e.flags.missed << ", " << std::hex << "(0x" << e.flags_word << std::dec << ")";
+  os << "\n\tTime1: " << e.time1;
+  os << "\n\tTime2: " << e.time2;
   os << std::hex;
   for(size_t i_c=0; i_c<32; ++i_c){
     if(i_c%8==0) os << "\n\t\t";
