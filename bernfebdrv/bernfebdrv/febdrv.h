@@ -1,7 +1,10 @@
+#include <string>
 #include <time.h>
+#include <sys/timeb.h>
 #include "febevt.h"
+#include <net/if.h>
 
-    // Ethernet switch register r/w
+// Ethernet switch register r/w
 #define FEB_RD_SR 0x0001
 #define FEB_WR_SR 0x0002
 #define FEB_RD_SRFF 0x0003
@@ -86,7 +89,11 @@ uint8_t buf[MAXPACKLEN];
 class FEBDRV{
 
 public:
-  FEBDRV(char *iface);
+  FEBDRV();
+
+  void Init(std::string iface) { Init(iface.c_str()); }
+
+  void Init(char *iface);
 
   int startDAQ(uint8_t mac5);
   int stopDAQ(uint8_t);
@@ -102,9 +109,10 @@ public:
 
   int initif(char *iface);
 
-  int sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf);
+  int sendcommand(const uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf);
 
   int pingclients();
+  uint64_t MACAddress(int client) const;
 
   int sendconfig(uint8_t mac5);
 
@@ -117,12 +125,26 @@ public:
   int senddata();
   int sendstats();
   int sendstats2();
+
   int polldata();
+  int recvL2pack();
+  void processL2pack(int,const uint8_t*);
+  int recvandprocessL2pack(const uint8_t*);
+  int polldata_setup();
+
+  void pollfeb(const uint8_t* mac);
+  void updateoverwritten();
+  void polldata_complete();
 
   static void free_subbufer (void*, void *hint); //call back from ZMQ sent function, hint points to subbufer index
 
   void* GetResponder() { return responder; }
   void* GetContext() { return context; }
+
+  int IncrementTotalLost(int i) { total_lost += i; return total_lost; }
+  int IncrementTotalAcquired(int i) { total_acquired += i; return total_acquired; }
+
+  FEBDTP_PKT_t const& ReceivedPkt() { return rpkt; }
 
 private:
 
@@ -179,5 +201,13 @@ private:
   int flushlink();
 
   EVENT_t * getnextevent();
+
+  int numbytes;
+  bool NOts0,NOts1;
+  bool REFEVTts0,REFEVTts1;
+  uint32_t tt0,tt1;
+  uint32_t ts0,ts1;
+  uint8_t ls2b0,ls2b1; //least sig 2 bits
+  EVENT_t *evt;
 
 };

@@ -26,7 +26,8 @@ CURLcode res;
 int FEBDRV::evnum[NBUFS]; //number of good events in the buffer fields
 int FEBDRV::evbufstat[NBUFS]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out   
 
-FEBDRV::FEBDRV(char* iface) : 
+
+FEBDRV::FEBDRV() : 
   GLOB_daqon(0),
   nclients(0),
   sockfd_w(-1), 
@@ -38,7 +39,9 @@ FEBDRV::FEBDRV(char* iface) :
   lostinfpga(0),
   total_lost(0),
   total_acquired(0)
-{
+  { }
+
+void FEBDRV::Init(char* iface){
 
   int rv;  
   memset(evbuf,0, sizeof(evbuf));
@@ -233,7 +236,7 @@ int FEBDRV::sendtofeb(int len, FEBDTP_PKT_t const& spkt)  //sending spkt
 
 int FEBDRV::recvfromfeb(int timeout_us, FEBDTP_PKT_t & rcvrpkt) //result is in rpkt
 {
-	int numbytes;
+  //	int numbytes;
             // set receive timeout
        tv.tv_usec=timeout_us;
        if (setsockopt(sockfd_r, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval))== -1){
@@ -255,7 +258,7 @@ int FEBDRV::flushlink()
       return 1;
 }
 
-int FEBDRV::sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf)
+int FEBDRV::sendcommand(const uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf)
 {
 
   FEBDTP_PKT_t spkt;
@@ -302,6 +305,17 @@ int FEBDRV::sendcommand(uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf)
   packlen=sendtofeb(packlen,spkt);
   if(packlen<=0) return 0; 
   return packlen;
+}
+
+uint64_t FEBDRV::MACAddress(int client) const{
+  if(client < nclients)
+    return 0;
+
+  uint64_t thismac=0;
+  for(int i=0; i<6; ++i)
+    thismac += ( macs[client][i] << (sizeof(uint8_t)*(5-i)) );
+  return thismac;
+
 }
 
 int FEBDRV::pingclients()
@@ -660,138 +674,168 @@ zmq_msg_close (&msg);
  
 }
 
+int FEBDRV::recvL2pack(){
+  return recvfromfeb(5000,rpkt);
+}
+
+void FEBDRV::processL2pack(int datalen,const uint8_t* mac){
+
+  EVENT_t *evt=0;
+
+  int jj=0;
+  while(jj<datalen)
+    {
+      auto ovrwr_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+      overwritten=*ovrwr_ptr;
+      jj=jj+2;
+      
+      auto lif_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+      lostinfpga=*lif_ptr;
+      jj=jj+2;
+      
+      total_lost+=lostinfpga;
+      lostperpoll_fpga[rpkt.src_mac[5]]+=lostinfpga;
+      
+      auto ts0_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
+      ts0=*ts0_ptr; jj=jj+4; 
+      auto ts1_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
+      ts1=*ts1_ptr; jj=jj+4; 
+      
+      ls2b0=ts0 & 0x00000003;
+      ls2b1=ts1 & 0x00000003;
+      tt0=(ts0 & 0x3fffffff) >>2;
+      tt1=(ts1 & 0x3fffffff) >>2;
+      tt0=(GrayToBin(tt0) << 2) | ls2b0;
+      tt1=(GrayToBin(tt1) << 2) | ls2b1;
+      tt0=tt0+5;//IK: correction based on phase drift w.r.t GPS
+      tt1=tt1+5; //IK: correction based on phase drift w.r.t GPS
+      NOts0=((ts0 & 0x40000000)>0); // check overflow bit
+      NOts1=((ts1 & 0x40000000)>0);
+      //        if((ts0 & 0x80000000)>0) {ts0=0x0; ts0_ref=tt0; ts0_ref_MEM[rpkt.src_mac[5]]=tt0;} 
+      //        else { ts0=tt0; ts0_ref=ts0_ref_MEM[rpkt.src_mac[5]]; }
+      //        if((ts1 & 0x80000000)>0) {ts1=0x0; ts1_ref=tt1; ts1_ref_MEM[rpkt.src_mac[5]]=tt1;} 
+      //        else { ts1=tt1; ts1_ref=ts1_ref_MEM[rpkt.src_mac[5]]; }
+      
+      if((ts0 & 0x80000000)>0)
+	{
+	  REFEVTts0=1; 
+	  ts0=tt0; 
+	  //ts0_ref=tt0; 
+	  ts0_ref_MEM[rpkt.src_mac[5]]=tt0;
+	} 
+      else {
+	REFEVTts0=0; 
+	ts0=tt0; 
+	//ts0_ref=ts0_ref_MEM[rpkt.src_mac[5]]; 
+      }
+      if((ts1 & 0x80000000)>0) 
+	{
+	  REFEVTts1=1; 
+	  ts1=tt1; 
+	  //ts1_ref=tt1; 
+	  ts1_ref_MEM[rpkt.src_mac[5]]=tt1;
+	} 
+      else {
+	REFEVTts1=0; 
+	ts1=tt1; 
+	//ts1_ref=ts1_ref_MEM[rpkt.src_mac[5]]; 
+      }
+      
+      //	 printf("T0=%u ns, T1=%u ns T0_ref=%u ns  T1_ref=%u ns \n",ts0,ts1,ts0_ref,ts1_ref);
+      //         tmp=ts0*1e9/(ts0_ref-1); ts0=tmp;
+      //         tmp=ts1*1e9/(ts0_ref-1); ts1=tmp;
+      //         tmp=ts1_ref*1e9/(ts0_ref-1); ts1_ref=tmp;
+      //	 printf("Corrected T0=%u ns, T1=%u ns T0_ref=%u ns  T1_ref=%u ns \n",ts0,ts1,ts0_ref,ts1_ref);
+      evt=getnextevent();
+      if(evt==0) {driver_state=DRV_BUFOVERRUN; printdate();  printf("Buffer overrun for FEB S/N %d !! Aborting.\n",mac[5]); continue;} 
+      evt->ts0=ts0;
+      evt->ts1=ts1;
+      evt->flags=0;
+      evt->mac5=rpkt.src_mac[5];
+      if(NOts0==0) evt->flags|=0x0001;    //opposite logic! 1 if TS is present, 0 if not!    
+      if(NOts1==0) evt->flags|=0x0002;        
+      if(REFEVTts0==1) evt->flags|=0x0004; //bit indicating TS0 reference event        
+      if(REFEVTts1==1) evt->flags|=0x0008; //bit indicating TS1 reference event        
+      for(int kk=0; kk<32; kk++) { 
+	auto adc_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
+	evt->adc[kk]=*adc_ptr; 
+	jj++; 
+	jj++;
+      }  
+      total_acquired++;
+      evtsperpoll[rpkt.src_mac[5]]++;
+    }
+  
+}
+
+int FEBDRV::recvandprocessL2pack(const uint8_t* mac){
+
+  numbytes = recvL2pack();
+  
+  if(numbytes<=0) return numbytes;       
+  if(rpkt.CMD!=FEB_DATA_CDR) return -1; //should not happen, but just in case..
+
+  processL2pack(numbytes-18,mac);
+
+  return numbytes;
+}
+
+int FEBDRV::polldata_setup(){
+
+  ftime(&mstime0);
+  
+  msperpoll=0;
+  overwritten=0;
+  lostinfpga=0;
+  //evtsperpoll=0;
+  memset(lostperpoll_cpu,0,sizeof(lostperpoll_cpu));
+  memset(lostperpoll_fpga,0,sizeof(lostperpoll_fpga));
+  memset(evtsperpoll,0,sizeof(evtsperpoll));
+  
+  if(GLOB_daqon==0) {sleep(1); return 0;} //if no DAQ running - just delay for not too fast ping
+
+  return 1;
+}
+
+void FEBDRV::pollfeb(const uint8_t* mac)
+{ 
+  sendcommand(mac,FEB_RD_CDR,0,buf); 
+  numbytes=1; rpkt.CMD=0; //clear these out
+}
+
+void FEBDRV::updateoverwritten(){
+  total_lost+=overwritten;
+  lostperpoll_cpu[rpkt.src_mac[5]]+=overwritten;
+}
+
+void FEBDRV::polldata_complete(){
+  //if(evtsperpoll>0) printf(" %d events per poll.\n",evtsperpoll); 
+  ftime(&mstime1);
+  msperpoll=(mstime1.time-mstime0.time)*1000+(mstime1.millitm-mstime0.millitm);
+}
+
+
 int FEBDRV::polldata() // poll data from daysy-chain and send it to the publisher socket
 {  
-bool NOts0,NOts1;
-bool REFEVTts0,REFEVTts1;
-uint32_t tt0,tt1;
-uint32_t ts0,ts1;
-//uint32_t ts0_ref,ts1_ref;
-uint8_t ls2b0,ls2b1; //least sig 2 bits
-//uint16_t adc;
-//uint64_t tmp;
+  int rv=0;
+  if(polldata_setup()==0) return 0;
 
-ftime(&mstime0);
-
-EVENT_t *evt=0;
-int rv=0;
-int jj;
-int numbytes; //number of received bytes
-int datalen;  //data buffer
-msperpoll=0;
-overwritten=0;
-lostinfpga=0;
-//evtsperpoll=0;
-memset(lostperpoll_cpu,0,sizeof(lostperpoll_cpu));
-memset(lostperpoll_fpga,0,sizeof(lostperpoll_fpga));
-memset(evtsperpoll,0,sizeof(evtsperpoll));
-
-if(GLOB_daqon==0) {sleep(1); return 0;} //if no DAQ running - just delay for not too fast ping
-for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
- {
-   sendcommand(macs[f],FEB_RD_CDR,0,buf);
-     numbytes=1;
-     rpkt.CMD=0; //just to start somehow
-     while(numbytes>0 && rpkt.CMD!=FEB_EOF_CDR) //loop on messages from one FEB
-     { 
-       numbytes=recvfromfeb(5000,rpkt);
-       if(numbytes==0) continue;       
-       if(rpkt.CMD!=FEB_DATA_CDR) continue; //should not happen, but just in case..
-        datalen=numbytes-18;
-	//printf("feb->host: received data packet %d bytes CMD=%04x from  %02x:%02x:%02x:%02x:%02x:%02x.\n", numbytes,rpkt.CMD,rpkt.src_mac[0],rpkt.src_mac[1],rpkt.src_mac[2],rpkt.src_mac[3],rpkt.src_mac[4],rpkt.src_mac[5]);
-
-        jj=0;
-        while(jj<datalen)
-         {
-        //printf(" Remaining events: %d\n",(t->gpkt).REG);
-        //printf("Flags: 0x%08x ",*(UInt_t*)(&(t->gpkt).Data[jj]));
-	   auto ovrwr_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
-	   overwritten=*ovrwr_ptr;
-	   jj=jj+2;
-	   auto lif_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
-	   lostinfpga=*lif_ptr;
-	jj=jj+2;
-        total_lost+=lostinfpga;
-        lostperpoll_fpga[rpkt.src_mac[5]]+=lostinfpga;
-	auto ts0_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
-        ts0=*ts0_ptr; jj=jj+4; 
-	auto ts1_ptr = reinterpret_cast<uint32_t*>(&(rpkt).Data[jj]);
-        ts1=*ts1_ptr; jj=jj+4; 
-//	printf("T0=%u ns, T1=%u ns \n",ts0,ts1);
-        ls2b0=ts0 & 0x00000003;
-        ls2b1=ts1 & 0x00000003;
-        tt0=(ts0 & 0x3fffffff) >>2;
-        tt1=(ts1 & 0x3fffffff) >>2;
-        tt0=(GrayToBin(tt0) << 2) | ls2b0;
-        tt1=(GrayToBin(tt1) << 2) | ls2b1;
-        tt0=tt0+5;//IK: correction based on phase drift w.r.t GPS
-        tt1=tt1+5; //IK: correction based on phase drift w.r.t GPS
-        NOts0=((ts0 & 0x40000000)>0); // check overflow bit
-        NOts1=((ts1 & 0x40000000)>0);
-//        if((ts0 & 0x80000000)>0) {ts0=0x0; ts0_ref=tt0; ts0_ref_MEM[rpkt.src_mac[5]]=tt0;} 
-//        else { ts0=tt0; ts0_ref=ts0_ref_MEM[rpkt.src_mac[5]]; }
-//        if((ts1 & 0x80000000)>0) {ts1=0x0; ts1_ref=tt1; ts1_ref_MEM[rpkt.src_mac[5]]=tt1;} 
-//        else { ts1=tt1; ts1_ref=ts1_ref_MEM[rpkt.src_mac[5]]; }
-
-        if((ts0 & 0x80000000)>0)
-	  {
-	    REFEVTts0=1; 
-	    ts0=tt0; 
-	    //ts0_ref=tt0; 
-	    ts0_ref_MEM[rpkt.src_mac[5]]=tt0;
-	  } 
-        else {
-	  REFEVTts0=0; 
-	  ts0=tt0; 
-	  //ts0_ref=ts0_ref_MEM[rpkt.src_mac[5]]; 
-	}
-        if((ts1 & 0x80000000)>0) 
-	  {
-	    REFEVTts1=1; 
-	    ts1=tt1; 
-	    //ts1_ref=tt1; 
-	    ts1_ref_MEM[rpkt.src_mac[5]]=tt1;
-	  } 
-        else {
-	  REFEVTts1=0; 
-	  ts1=tt1; 
-	  //ts1_ref=ts1_ref_MEM[rpkt.src_mac[5]]; 
-	}
-
-//	 printf("T0=%u ns, T1=%u ns T0_ref=%u ns  T1_ref=%u ns \n",ts0,ts1,ts0_ref,ts1_ref);
-//         tmp=ts0*1e9/(ts0_ref-1); ts0=tmp;
-//         tmp=ts1*1e9/(ts0_ref-1); ts1=tmp;
-//         tmp=ts1_ref*1e9/(ts0_ref-1); ts1_ref=tmp;
-//	 printf("Corrected T0=%u ns, T1=%u ns T0_ref=%u ns  T1_ref=%u ns \n",ts0,ts1,ts0_ref,ts1_ref);
-        evt=getnextevent();
-        if(evt==0) {driver_state=DRV_BUFOVERRUN; printdate();  printf("Buffer overrun for FEB S/N %d !! Aborting.\n",macs[f][5]); continue;} 
-        evt->ts0=ts0;
-        evt->ts1=ts1;
-	evt->flags=0;
-        evt->mac5=rpkt.src_mac[5];
-        if(NOts0==0) evt->flags|=0x0001;    //opposite logic! 1 if TS is present, 0 if not!    
-        if(NOts1==0) evt->flags|=0x0002;        
-        if(REFEVTts0==1) evt->flags|=0x0004; //bit indicating TS0 reference event        
-        if(REFEVTts1==1) evt->flags|=0x0008; //bit indicating TS1 reference event        
-        for(int kk=0; kk<32; kk++) { 
-	  auto adc_ptr = reinterpret_cast<uint16_t*>(&(rpkt).Data[jj]);
-	  evt->adc[kk]=*adc_ptr; 
-	  jj++; 
-	  jj++;
-	}  
-        total_acquired++;
-        evtsperpoll[rpkt.src_mac[5]]++;
-        }   //loop on event buffer in one L2 packet     
-     }	// loop on messages from 1 FEB
-     total_lost+=overwritten;
-        lostperpoll_cpu[rpkt.src_mac[5]]+=overwritten;
-
- } //loop on FEBS
-//if(evtsperpoll>0) printf(" %d events per poll.\n",evtsperpoll); 
-ftime(&mstime1);
-msperpoll=(mstime1.time-mstime0.time)*1000+(mstime1.millitm-mstime0.millitm);
-return rv;
+  for(int f=0; f<nclients;f++) //loop on all connected febs : macs[f][6]
+    {
+      pollfeb(macs[f]);
+      
+      while(numbytes>0 && rpkt.CMD!=FEB_EOF_CDR) //loop on messages from one FEB
+	if( recvandprocessL2pack(macs[f])<=0 ) continue;
+      
+      updateoverwritten();
+      
+    } //loop on FEBS
+  
+  polldata_complete();
+  return rv;
+  
 }
+
 
 
 void usage()
@@ -806,7 +850,8 @@ int main (int argc, char **argv)
   
   if(argc!=2) { usage(); return 0;}
 
-  FEBDRV febdrv(argv[1]);
+  FEBDRV febdrv;
+  febdrv.Init(argv[1]);
   
   zmq_msg_t request;
   char cmd[32]; //command string

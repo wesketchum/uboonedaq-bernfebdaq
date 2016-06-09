@@ -65,8 +65,8 @@ size_t bernfebdaq::BernFEBFakeData::GetFEBData(uint64_t const& feb_id){
     for(auto const& mod : missing_events_mod_) 
       if(i_e%mod==0) feb_data.flags.missed++;
 
-    feb_data.time1 = time_map_[feb_id] % time1_max_;
-    feb_data.time2 = time_map_[feb_id] % time2_max_;
+    feb_data.time1.rawts = time_map_[feb_id] % time1_max_;
+    feb_data.time2.rawts = time_map_[feb_id] % time2_max_;
     time_map_[feb_id] += time_increment_per_event_;
 
     std::generate_n(feb_data.adc,

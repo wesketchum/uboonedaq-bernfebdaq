@@ -114,6 +114,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 {
   TRACE(TR_GD_LOG,"BernFeb::GetData() called");
 
+  if( GetDataSetup()!=1 ) return false;;
+
   size_t this_n_events=0,n_events=0;
   for(auto const& id : FEBIDs_){
     this_n_events = GetFEBData(id)/sizeof(BernFEBEvent);
@@ -126,6 +128,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
   }
   
   TRACE(TR_GD_LOG,"BernFeb::GetData() completed, n_events=%lu",n_events);
+
+  GetDataComplete();
 
   if(n_events>0) return true;
   return false;
@@ -169,15 +173,15 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",it->c_str());
 
-    if((int64_t)it->time1 <= local_last_time)
+    if((int64_t)it->time1.Time() <= local_last_time)
       ++local_time_resets;
-    local_last_time = it->time1;
+    local_last_time = it->time1.Time();
 
-    time = it->time1+(feb.time_resets+local_time_resets)*1e9;
+    time = it->time1.Time()+(feb.time_resets+local_time_resets)*1e9;
 
     TRACE(TR_FF_DEBUG,
 	  "\n\tBernFEb::FillFragment() ... ev_time is %u, resets=%lu, local_resets=%lu, time=%ld",
-	  it->time1,feb.time_resets,local_time_resets,time);
+	  it->time1.Time(),feb.time_resets,local_time_resets,time);
 
     if(time<feb.next_time_start)
       TRACE(TR_WARNING,"BernFeb::FillFragment() WARNING! Time out of place! %ld vs %ld",time,feb.next_time_start);
@@ -198,7 +202,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   }
 
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Data window completed, [%u,%u), events=%ld",
-	it_start_fragment->time1,it_end_fragment->time1,std::distance(it_start_fragment,it_end_fragment));
+	it_start_fragment->time1.Time(),it_end_fragment->time1.Time(),std::distance(it_start_fragment,it_end_fragment));
 
 
   //ok, queue was non-empty, and we saw our last event. Need to loop through and do proper accounting now.
@@ -206,12 +210,12 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   local_last_time = feb.last_time_counter;
   for(auto it=it_start_fragment; it!=it_end_fragment; ++it){
 
-    if((int32_t)it->time1 <= feb.last_time_counter){
+    if((int32_t)it->time1.Time() <= feb.last_time_counter){
       ++feb.time_resets;
       TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() : Time reset (evtime=%u,last_time=%d). Total resets=%lu",
-	    it->time1,feb.last_time_counter,feb.time_resets);
+	    it->time1.Time(),feb.last_time_counter,feb.time_resets);
     }
-    feb.last_time_counter = it->time1;
+    feb.last_time_counter = it->time1.Time();
     
     if(it->flags.overwritten > feb.overwritten_counter)
       metadata.increment(it->flags.missed,it->flags.overwritten-feb.overwritten_counter);

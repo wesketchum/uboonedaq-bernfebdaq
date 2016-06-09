@@ -52,6 +52,8 @@ namespace bernfebdaq {
 
     //gets the data. Output is size of data filled. Input is FEM ID.
     virtual size_t GetFEBData(uint64_t const&) = 0;
+    virtual int    GetDataSetup() { return 1; }
+    virtual int    GetDataComplete() { return 1; }
 
     size_t last_read_data_size_;
     int    last_status_;

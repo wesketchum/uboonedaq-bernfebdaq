@@ -31,3 +31,18 @@ simple_plugin(BernFEBFakeData "generator"
   ${MF_UTILITIES}
   ${CETLIB}
   )
+
+simple_plugin(BernFEBData "generator"
+  bernfebdaq-BernFEB_GeneratorBase
+  bernfebdaq-core_Overlays
+  bernfebdrv_febdrv
+  artdaq_Application
+  artdaq_DAQdata
+  artdaq-core_Utilities
+  artdaq-core_Data
+  ${ART_UTILITIES}
+  ${FHICLCPP}
+  ${MF_MESSAGELOGGER}
+  ${MF_UTILITIES}
+  ${CETLIB}
+  )
