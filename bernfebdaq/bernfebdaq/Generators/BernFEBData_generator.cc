@@ -16,12 +16,20 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
 {
   TRACE(TR_LOG,"BernFEBData constructor called");  
 
-  febdrv.Init( ps_.get<std::string>("eth_interface","eth0") );
+  auto eth_interface = ps_.get<std::string>("eth_interface","eth0");
+  TRACE(TR_LOG,"BernFEBData constructor : Calling driver init with interface %s",eth_interface.c_str());  
+  
+  febdrv.Init( eth_interface.c_str() );
+
+  TRACE(TR_LOG,"BernFEBData constructor : driver initialized");
+
   runBiasOn = ps_.get<bool>("BiasON",true);
 
 
   PingFEBs();
   febdrv.SetDriverState(DRV_OK);
+
+  sleep(5);
 
   if(runBiasOn) febdrv.biasON(0xFF);
   else febdrv.biasOFF(0xFF);
@@ -36,8 +44,12 @@ bernfebdaq::BernFEBData::~BernFEBData(){
 }
 
 void bernfebdaq::BernFEBData::PingFEBs(){
+  TRACE(TR_LOG,"BernFEBData::PingFEBs called");  
 
   int n_active_febs = febdrv.pingclients();
+
+  TRACE(TR_LOG,"BernFEBData::PingFEBs : Driver claims %d active FEBs.",n_active_febs);  
+
 
   if( n_active_febs != (int)FEBIDs_.size()){
     TRACE(TR_ERROR,"BernFEBData::ConfigureStart() : Wrong FEB size. Expected %lu, detected %d",
@@ -47,17 +59,18 @@ void bernfebdaq::BernFEBData::PingFEBs(){
 
   TRACE(TR_LOG,"BernFEBData::ConfigureStart() : Detected %d FEBs",n_active_febs);
 
-  for(size_t ifeb=0; ifeb<FEBIDs_.size(); ++ifeb){
-
-    if(febdrv.MACAddress(ifeb) != FEBIDs_[ifeb]){
-      TRACE(TR_ERROR,"BernFEBData::ConfigureStart() : Wrong FEB MAC Address, FEB %lu. Expected %#06lX, detected %#06lX",
+  for(int ifeb=0; ifeb<n_active_febs; ++ifeb){
+    if(std::find(FEBIDs_.begin(),FEBIDs_.end(),febdrv.MACAddress(ifeb))==FEBIDs_.end()){
+      TRACE(TR_ERROR,"BernFEBData::ConfigureStart() : Wrong FEB MAC Address, FEB %d. Expected %#06lX, detected %#06lX",
 	    ifeb,FEBIDs_[ifeb],febdrv.MACAddress(ifeb));
       throw cet::exception("ERROR in BernFEBData. Wrong FEBs");
     }
 
-    TRACE(TR_LOG,"BernFEBData::ConfigureStart() : Detected FEB %lu, MAC Address %#06lX",
+    TRACE(TR_LOG,"BernFEBData::ConfigureStart() : Detected FEB %d, MAC Address %#06lX",
 	  ifeb,febdrv.MACAddress(ifeb));
   }
+
+  TRACE(TR_LOG,"BernFEBData::PingFEBs finished");  
 
 }
 

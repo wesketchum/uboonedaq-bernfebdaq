@@ -91,9 +91,9 @@ class FEBDRV{
 public:
   FEBDRV();
 
-  void Init(std::string iface) { Init(iface.c_str()); }
+  //void Init(std::string iface) { Init(iface.c_str()); }
 
-  void Init(char *iface);
+  void Init(const char *iface);
 
   int startDAQ(uint8_t mac5);
   int stopDAQ(uint8_t);
@@ -107,7 +107,7 @@ public:
   void ConfigSetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index, bool value);
   bool ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index);
 
-  int initif(char *iface);
+  int initif(const char *iface);
 
   int sendcommand(const uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t * buf);
 

@@ -30,7 +30,7 @@ cet_cmake_env()
 cet_set_compiler_flags(DIAGS VIGILANT
  WERROR
  NO_UNDEFINED
- EXTRA_FLAGS -pedantic -Wall -fPIC -DLINUX -D_LINUX
+ EXTRA_FLAGS -pedantic -Wall -fPIC -DLINUX -D_LINUX -std=c++11
  )
 
 cet_report_compiler_flags()

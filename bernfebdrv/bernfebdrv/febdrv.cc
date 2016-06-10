@@ -39,9 +39,15 @@ FEBDRV::FEBDRV() :
   lostinfpga(0),
   total_lost(0),
   total_acquired(0)
-  { }
+  { printf("Constructed FEBDRV\n"); }
 
-void FEBDRV::Init(char* iface){
+void FEBDRV::Init(const char* iface){
+
+
+
+  printf("Calling driver Init with iface=%s.\n",iface);
+
+  sleep(2);
 
   int rv;  
   memset(evbuf,0, sizeof(evbuf));
@@ -55,10 +61,15 @@ void FEBDRV::Init(char* iface){
   memset(FEB_present,0,256);
   memset(FEB_lastheard,0,256); //number of seconds since the board is heard
   memset(FEB_VCXO,0,256);
+
+  printf("Memsets finished..\n");
+
   // network interface to febs
   rv=initif(iface);
   if(rv==0) {printdate(); printf("Can't initialize network interface %s! Exiting.\n",iface);}
   context = zmq_ctx_new();
+
+  printf("FEB network interface initialized.\n");
   
   //  Socket to respond to clients
   responder = zmq_socket (context, ZMQ_REP);
@@ -155,7 +166,7 @@ bool FEBDRV::ConfigGetBit(uint8_t *buffer, uint16_t bitlen, uint16_t bit_index)
 }
 
 
-int FEBDRV::initif(char *iface)
+int FEBDRV::initif(const char *iface)
 {
   //spkt.iptype=0x0108; // IP type 0x0801
 	tv.tv_sec = 0;  /* 0 Secs Timeout */
@@ -308,12 +319,14 @@ int FEBDRV::sendcommand(const uint8_t *mac, uint16_t cmd, uint16_t reg, uint8_t 
 }
 
 uint64_t FEBDRV::MACAddress(int client) const{
-  if(client < nclients)
+  if(client >= nclients)
     return 0;
 
-  uint64_t thismac=0;
-  for(int i=0; i<6; ++i)
-    thismac += ( macs[client][i] << (sizeof(uint8_t)*(5-i)) );
+  uint64_t thismac=0,tmp;
+  for(int i=5; i>=0; --i){
+    tmp = macs[client][i];
+    thismac = thismac + ( tmp << (8*(5-i)) );
+  }
   return thismac;
 
 }
