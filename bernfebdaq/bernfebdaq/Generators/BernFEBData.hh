@@ -4,6 +4,7 @@
 #include "bernfebdaq/Generators/BernFEB_GeneratorBase.hh"
 
 #include "bernfebdrv/febdrv.h"
+#include "bernfebdrv/febconf.h"
 
 namespace bernfebdaq {    
 
@@ -23,6 +24,7 @@ namespace bernfebdaq {
     int    GetDataComplete();
 
     FEBDRV febdrv;
+    FEBCONF febconf;
 
     void PingFEBs();
     bool runBiasOn;

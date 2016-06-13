@@ -484,7 +484,7 @@ int FEBDRV::biasOFF(uint8_t mac5)
   return 1;
 }
 
-int FEBDRV::configu(uint8_t mac5, uint8_t *buf1, int len)
+int FEBDRV::configu(uint8_t mac5, const uint8_t *buf1, int len)
 {
   int rv=1;
   //printf("called configu(%02x,buf,%d)\n",mac5,len);

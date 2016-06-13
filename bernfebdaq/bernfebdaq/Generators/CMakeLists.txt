@@ -36,6 +36,7 @@ simple_plugin(BernFEBData "generator"
   bernfebdaq-BernFEB_GeneratorBase
   bernfebdaq-core_Overlays
   bernfebdrv_febdrv
+  bernfebdrv_febconf
   artdaq_Application
   artdaq_DAQdata
   artdaq-core_Utilities

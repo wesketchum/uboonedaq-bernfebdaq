@@ -25,6 +25,15 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
 
   runBiasOn = ps_.get<bool>("BiasON",true);
 
+  febconf.SetSCRConf(ps_.get<std::string>("SCRCONF"));
+  febconf.SetPMRConf(ps_.get<std::string>("PMRCONF"));
+  if(!febconf.configOK()){
+    TRACE(TR_ERROR,"BernFEBData constructor : Bad config file(s) SCR=%s, PMR=%s",
+	  ps_.get<std::string>("SCRCONF").c_str(),
+	  ps_.get<std::string>("PMRCONF").c_str());
+    throw cet::exception("BernFEBData: Bad config files!");
+  }
+    
 
   PingFEBs();
   febdrv.SetDriverState(DRV_OK);
@@ -33,6 +42,8 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
 
   if(runBiasOn) febdrv.biasON(0xFF);
   else febdrv.biasOFF(0xFF);
+
+  febdrv.configu(0xFF,febconf.GetConfBuffer(0xFF),(1144+224)/8);
 
   TRACE(TR_LOG,"BernFEBData constructor completed");  
 }

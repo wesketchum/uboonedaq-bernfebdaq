@@ -119,7 +119,7 @@ public:
   int biasON(uint8_t mac5);
   int biasOFF(uint8_t mac5);
 
-  int configu(uint8_t mac5, uint8_t *buf1, int len);
+  int configu(uint8_t mac5, const uint8_t *buf1, int len);
   int getSCR(uint8_t mac5, uint8_t *buf1);
 
   int senddata();

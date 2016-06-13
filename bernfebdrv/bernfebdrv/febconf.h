@@ -33,12 +33,18 @@ class FEBCONF{
 
   bool configOK() const { return (config_SCR_OK_ && config_PMR_OK_); }
   
+  uint8_t const* GetSCRConf() const { return bufSCR; }
+  uint8_t const* GetPMRConf() const { return bufPMR; }
+
+  uint8_t const* GetConfBuffer(uint8_t const&);
+
  private:
 
   int readbitstream(const char*,uint8_t*);
 
   uint8_t bufSCR[MAXPACKLEN];
   uint8_t bufPMR[MAXPACKLEN];
+  uint8_t confbuf[MAXPACKLEN];
 
   bool config_SCR_OK_;
   bool config_PMR_OK_;
