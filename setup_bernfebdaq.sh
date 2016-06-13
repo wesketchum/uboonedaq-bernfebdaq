@@ -8,9 +8,9 @@ export BASE_NAME=bernfebdaq
 
 mkdir -p $INSTALL_DIR
 
-export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
-   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
-   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
+#export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
+#   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
+#   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
 
 source $BASE_DIR/setup_common
 

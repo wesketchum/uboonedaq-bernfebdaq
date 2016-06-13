@@ -8,7 +8,6 @@ export BASE_NAME=bernfebdaq-core
 
 mkdir -p $INSTALL_DIR
 
-
 source $BASE_DIR/setup_common
 
 echo ""
