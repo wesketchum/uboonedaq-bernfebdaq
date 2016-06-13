@@ -374,31 +374,31 @@ int FEBDRV::pingclients()
 
 int FEBDRV::sendconfig(uint8_t mac5)
 {
-//t->SendCMD(t->dstmac,FEB_SET_RECV,fNumberEntry75->GetNumber(),t->srcmac);
+  //t->SendCMD(t->dstmac,FEB_SET_RECV,fNumberEntry75->GetNumber(),t->srcmac);
   int nreplies=0;
   int PrevConfigured=FEB_configured[mac5];
-dstmac[5]=mac5;
-FEB_configured[mac5]=0;
-sendcommand(dstmac,FEB_WR_SCR,0x0000,bufSCR[mac5]);
- while(recvfromfeb(50000,rpkt)) { 
-  if(rpkt.CMD!=FEB_OK_SCR) return 0;
-  nreplies++;
+  dstmac[5]=mac5;
+  FEB_configured[mac5]=0;
+  sendcommand(dstmac,FEB_WR_SCR,0x0000,bufSCR[mac5]);
+  while(recvfromfeb(50000,rpkt)) { 
+    if(rpkt.CMD!=FEB_OK_SCR) return 0;
+    nreplies++;
   }
   if(nreplies==0) return 0;
   if(nreplies!=nclients && mac5==255) return 0;
-
-sendcommand(dstmac,FEB_WR_PMR,0x0000,bufPMR[mac5]);
- if(!recvfromfeb(50000,rpkt))  return 0;
- while(recvfromfeb(50000,rpkt)) { 
-  if(rpkt.CMD!=FEB_OK_PMR) return 0;
-  nreplies++;
+  
+  sendcommand(dstmac,FEB_WR_PMR,0x0000,bufPMR[mac5]);
+  if(!recvfromfeb(50000,rpkt))  return 0;
+  while(recvfromfeb(50000,rpkt)) { 
+    if(rpkt.CMD!=FEB_OK_PMR) return 0;
+    nreplies++;
   }
   if(nreplies==0) return 0;
   if(nreplies!=nclients && mac5==255) return 0;
-
-FEB_configured[mac5]=PrevConfigured+1;
-
-return 1;
+  
+  FEB_configured[mac5]=PrevConfigured+1;
+  
+  return 1;
 }
 
 
@@ -486,14 +486,14 @@ int FEBDRV::biasOFF(uint8_t mac5)
 
 int FEBDRV::configu(uint8_t mac5, uint8_t *buf1, int len)
 {
-int rv=1;
-//printf("called configu(%02x,buf,%d)\n",mac5,len);
-if(len != (1144+224)/8) { rv=0; return 0;}
-memcpy(bufSCR[mac5],buf1,1144/8);
-memcpy(bufPMR[mac5],buf1+1144/8,224/8);
-
- rv=sendconfig(mac5);
- return rv;
+  int rv=1;
+  //printf("called configu(%02x,buf,%d)\n",mac5,len);
+  if(len != (1144+224)/8) { rv=0; return 0;}
+  memcpy(bufSCR[mac5],buf1,1144/8);
+  memcpy(bufPMR[mac5],buf1+1144/8,224/8);
+  
+  rv=sendconfig(mac5);
+  return rv;
 }
 
 int FEBDRV::getSCR(uint8_t mac5, uint8_t *buf1)
