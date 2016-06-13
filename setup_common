@@ -1,8 +1,8 @@
 echo # This script is intended to be sourced.
 
-export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
-   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
-   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
+#export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
+#   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
+#   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
 
 sh -c "[ `ps $$ | grep bash | wc -l` -gt 0 ] || { echo 'Please switch to the bash shell before running the artdaq-demo.'; exit; }" || exit
 

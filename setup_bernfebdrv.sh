@@ -6,10 +6,12 @@ export INSTALL_DIR=$BASE_DIR/install
 
 mkdir -p $INSTALL_DIR
 
-#export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
-#export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
-#   UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
-#   CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
+if [[ $1 = "ubuntu" ]]; then
+    echo $1
+    export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
+	UPS_OVERRIDE='-H Linux64bit+2.6-2.12' \
+	CET_PLATINFO=Linux64bit+2.6-2.12:slf6:x86_64
+fi
 
 source $BASE_DIR/bernfebdrv/setup/setupBERNFEBDRV
 
