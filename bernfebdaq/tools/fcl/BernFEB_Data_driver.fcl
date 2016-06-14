@@ -31,6 +31,8 @@ fragment_receiver: {
    FEBDTPBufferCapacity: 1024
 
    eth_interface : eth1
+   SCRCONF: /home/lhep/uboonedaq-bernfebdaq/bernfebdrv/CONF/CITIROC_SC_PROFILE1.txt
+   PMRCONF: /home/lhep/uboonedaq-bernfebdaq/bernfebdrv/CONF/CITIROC_PROBEbitstream.txt
 
    #throttle_usecs: 2e6
    #throttle_usecs_check: 1e6
