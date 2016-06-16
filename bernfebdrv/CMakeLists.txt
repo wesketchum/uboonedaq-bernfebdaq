@@ -42,6 +42,7 @@ find_ups_product( gcc v4_9_2 )
 # macros for art_dictionary and simple_plugin
 #include(BuildPlugins)
 #include(CetTest)
+#include(ArtMake)
 
 #include_directories($ENV{CAENCOMMDIR}/include)
 #link_directories($ENV{CAENCOMMDIR}/lib/x64)

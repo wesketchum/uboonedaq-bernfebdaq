@@ -80,21 +80,17 @@ void FEBCONF::SetPMRConf(const char* pmrf){
   
 }
 
-uint8_t const* FEBCONF::GetConfBuffer(uint8_t const& mac5){
+uint8_t const* FEBCONF::GetConfBuffer(){
 
-  char cmd[32];
-  sprintf(cmd,"SETCONF");
-  cmd[8]=mac5;
+  //char cmd[32];
+  //sprintf(cmd,"SETCONF");
+  //cmd[0]=mac5;
 
-  printf ("Generating command %s...", cmd);
+  //printf ("Generating command %s to mac5=%hu\n", cmd,mac5);
+  //printf ("Generating command SETCONF to mac5=%hu\n", mac5);
   
-  memcpy(confbuf,cmd,9);
-  memcpy(confbuf+9,bufSCR,1144/8);
-  memcpy(confbuf+9+1144/8,bufPMR,224/8);
-
-  memcpy(confbuf,cmd,9);
-  memcpy(confbuf+9,bufSCR,1144/8);
-  memcpy(confbuf+9+1144/8,bufPMR,224/8);
+  memcpy(confbuf,bufSCR,1144/8);
+  memcpy(confbuf+1144/8,bufPMR,224/8);
 
   return confbuf;
 
@@ -109,8 +105,16 @@ void FEBCONF::SendConfs(uint8_t const& mac5){
   void *requester = zmq_socket (context, ZMQ_REQ);
   zmq_connect (requester, "tcp://localhost:5555");
 
+  char cmd[32];
+  sprintf(cmd,"SET_CONF");
+  cmd[8]=mac5;
+
+  uint8_t mybuf[MAXPACKLEN];
+  memcpy(mybuf,cmd,9);
+  memcpy(mybuf+9,GetConfBuffer(),(1144+224)/8);
+
   //zmq_send_const ( requester, buf, (1144+224)/8+9, 0);
-  zmq_send ( requester, GetConfBuffer(mac5) , (1144+224)/8+9, 0);
+  zmq_send ( requester, mybuf , (1144+224)/8+9, 0);
   
   printf ("waiting for reply..\n");
   

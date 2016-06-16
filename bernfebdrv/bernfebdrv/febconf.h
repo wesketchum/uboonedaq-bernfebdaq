@@ -36,7 +36,7 @@ class FEBCONF{
   uint8_t const* GetSCRConf() const { return bufSCR; }
   uint8_t const* GetPMRConf() const { return bufPMR; }
 
-  uint8_t const* GetConfBuffer(uint8_t const&);
+  uint8_t const* GetConfBuffer();
 
  private:
 

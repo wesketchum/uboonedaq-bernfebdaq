@@ -22,8 +22,13 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
   febdrv.Init( eth_interface.c_str() );
 
   TRACE(TR_LOG,"BernFEBData constructor : driver initialized");
-
+  
   runBiasOn = ps_.get<bool>("BiasON",true);
+
+  sleep(2);
+  febdrv.sendstats();
+  febdrv.sendstats2();
+  sleep(2);
 
   febconf.SetSCRConf(ps_.get<std::string>("SCRCONF"));
   febconf.SetPMRConf(ps_.get<std::string>("PMRCONF"));
@@ -38,12 +43,28 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
   PingFEBs();
   febdrv.SetDriverState(DRV_OK);
 
-  sleep(5);
+  sleep(1);
+  febdrv.sendstats();
+  febdrv.sendstats2();
 
+  for(auto const& febid : FEBIDs_){
+    febdrv.configu((febid & 0xff),febconf.GetConfBuffer(),(1144+224)/8);
+    sleep(1);
+  }
+
+  for(int i=0; i<10; ++i){
+    sleep(1);
+    febdrv.sendstats();
+    febdrv.sendstats2();
+  }
   if(runBiasOn) febdrv.biasON(0xFF);
   else febdrv.biasOFF(0xFF);
 
-  febdrv.configu(0xFF,febconf.GetConfBuffer(0xFF),(1144+224)/8);
+  for(int i=0; i<10; ++i){
+    sleep(1);
+    febdrv.sendstats();
+    febdrv.sendstats2();
+  }
 
   TRACE(TR_LOG,"BernFEBData constructor completed");  
 }
@@ -117,8 +138,16 @@ int bernfebdaq::BernFEBData::GetDataComplete(){
 size_t bernfebdaq::BernFEBData::GetFEBData(uint64_t const& feb_id){
   TRACE(TR_GD_LOG,"BernFEBData::GetFEBData(0x%lx) called",feb_id);  
 
+  uint8_t mac_by_byte[6];
+  for(size_t i=0; i<6; ++i)
+    mac_by_byte[i] = ( (feb_id >> 8*(5-i)) & 0xff);
+
   //send request for data
-  febdrv.pollfeb(reinterpret_cast<const uint8_t*>(&feb_id));
+  //const uint8_t* febid_ptr = reinterpret_cast<const uint8_t*>(&feb_id);
+  //const uint8_t* mac_ptr = febid_ptr +2;
+  TRACE(TR_GD_LOG,"BernFEBData::GetFEBData(0x%lx) : Polling feb with mac=%2x:%2x:%2x:%2x:%2x:%2x",
+	feb_id,mac_by_byte[0],mac_by_byte[1],mac_by_byte[2],mac_by_byte[3],mac_by_byte[4],mac_by_byte[5]);
+  febdrv.pollfeb(mac_by_byte);
 
   size_t data_size=0;
   size_t thisdata=0;
@@ -126,6 +155,7 @@ size_t bernfebdaq::BernFEBData::GetFEBData(uint64_t const& feb_id){
 
   //first, let's get some data
   int nbytes = febdrv.recvL2pack();
+  TRACE(TR_GD_LOG,"BernFEBData::GetFEBData : recvfromfeb %d bytes",nbytes);
 
   while(nbytes>0){
 

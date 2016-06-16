@@ -1,4 +1,4 @@
-#include <string>
+#include <string.h>
 #include <time.h>
 #include <sys/timeb.h>
 #include "febevt.h"
@@ -68,19 +68,19 @@ typedef struct {
 	uint8_t   Data[MAXPAYLOAD]; /*!< FEBDTP data field, 50-8=42 bytes*/
 
 } FEBDTP_PKT_t; // packet total length 64 bytes, 42 useful data
+/*
+static uint8_t bufPMR[256][1500];
+static uint8_t bufSCR[256][1500];
+static uint8_t FEB_present[256];
+static time_t FEB_lastheard[256]; //number of seconds since the board is heard, -1= never
+static uint8_t FEB_configured[256];
+static uint8_t FEB_daqon[256];
+static uint8_t FEB_evrate[256];
+static uint8_t FEB_biason[256];
+static uint16_t FEB_VCXO[256];
 
-uint8_t bufPMR[256][1500];
-uint8_t bufSCR[256][1500];
-uint8_t FEB_present[256];
-time_t FEB_lastheard[256]; //number of seconds since the board is heard, -1= never
-uint8_t FEB_configured[256];
-uint8_t FEB_daqon[256];
-uint8_t FEB_evrate[256];
-uint8_t FEB_biason[256];
-uint16_t FEB_VCXO[256];
-
-uint8_t buf[MAXPACKLEN];
-
+static uint8_t buf[MAXPACKLEN];
+*/
 
 #define EVSPERFEB 1024   // max events per feb per poll to buffer
 #define NBUFS 2   // number of buffers for double-buffering
@@ -159,7 +159,8 @@ private:
   void *pubstats2 = NULL;
   
   FEBDTP_PKT_t rpkt; //send and receive packets
-  EVENT_t evbuf[NBUFS][256*EVSPERFEB+1]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
+  //EVENT_t evbuf[NBUFS][256*EVSPERFEB+1]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
+  EVENT_t evbuf[NBUFS][25*EVSPERFEB+1]; //0MQ backend event buffer, first index-triple-buffering, second - feb, third-event
   static int evnum[NBUFS]; //number of good events in the buffer fields
   static int evbufstat[NBUFS]; //flag, showing current status of sub-buffer: 0= empty, 1= being filled, 2= full, 3=being sent out   
   int evtsperpoll[256];
@@ -210,4 +211,15 @@ private:
   uint8_t ls2b0,ls2b1; //least sig 2 bits
   EVENT_t *evt;
 
+  static uint8_t bufPMR[256][1500];
+  static uint8_t bufSCR[256][1500];
+  static uint8_t FEB_present[256];
+  static time_t FEB_lastheard[256]; //number of seconds since the board is heard, -1= never
+  static uint8_t FEB_configured[256];
+  static uint8_t FEB_daqon[256];
+  static uint8_t FEB_evrate[256];
+  static uint8_t FEB_biason[256];
+  static uint16_t FEB_VCXO[256];
+  
+  static uint8_t buf[MAXPACKLEN];
 };

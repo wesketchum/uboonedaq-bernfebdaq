@@ -1,5 +1,5 @@
 cet_make_library( LIBRARY_NAME bernfebdrv_febdrv
-		  SOURCE febdrv.cc
+		  SOURCE FEBDRV.cc
 		  LIBRARIES
 		     zmq
 		)
@@ -10,5 +10,13 @@ cet_make_library( LIBRARY_NAME bernfebdrv_febconf
 		     zmq
 		)
 
+cet_make_exec(febdrv
+		LIBRARIES
+		  bernfebdrv_febdrv
+		  zmq)
+cet_make_exec(test_febdrv
+		LIBRARIES
+		  bernfebdrv_febdrv
+)
 install_headers()
 
