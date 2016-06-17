@@ -25,10 +25,11 @@ int s,i,slen=sizeof(si_other), recv_len;
 char buf[BUFLEN];
 
 
+#include <string>
 
-void die(char *s)
+void die(std::string s)
 {
- perror(s);
+  perror(s.c_str());
  exit(1);
 }
 
@@ -41,10 +42,10 @@ void usage()
 }
 
 //'9999-12-31 23:59:59.999999'
-void sendudp(char *message)
+void sendudp(char *message, int len)
 {
 // printf("Sending %d bytes\n",strlen(message));
-  if(sendto(s, message, strlen(message), 0, (struct sockaddr*) &si_other, slen)==-1) die("sendto()");
+  if(sendto(s, message, len, 0, (struct sockaddr*) &si_other, slen)==-1) die("sendto()");
 }
 
 void updatedb_dstat()
@@ -56,8 +57,8 @@ void updatedb_dstat()
   printf("(`status`, `lastseen`, `nfebs`, `pollperiod`, `daqon`) = (%d,'%s',%d,%d,%d)\n",ds.status,dtm,ds.nfebs,ds.msperpoll,ds.daqon);
 
  // printf("drvstats datime=%ldi,daqon=%di,status=%di,nclients=%di,msperpoll=%di\n",ds.datime,ds.daqon,ds.status,ds.nfebs,ds.msperpoll);
-  sprintf(query,"drvstats datime=%ldi,daqon=%di,status=%di,nclients=%di,msperpoll=%di",ds.datime,ds.daqon,ds.status,ds.nfebs,ds.msperpoll);
-  sendudp(query);
+  int len = sprintf(query,"drvstats datime=%ldi,daqon=%di,status=%di,nclients=%di,msperpoll=%di",ds.datime,ds.daqon,ds.status,ds.nfebs,ds.msperpoll);
+  sendudp(query,len);
 //if (mysql_query(con, query)) {
 //     printf("%s\n", mysql_error(con));
 //  }
@@ -67,9 +68,9 @@ void updatedb_febstat()
 {
  // printf("fs. %02x:%02x:%02x:%02x:%02x:%02x %s %s connected=%d configured=%d biason=%d error=%d evtsperpoll=%d lostcpu=%d lostfpga=%d evtrate=%f\n",fs.mac[0],fs.mac[1],fs.mac[2],fs.mac[3],fs.mac[4],fs.mac[5],fs.fwcpu,fs.fwfpga,fs.connected, fs.configured, fs.biason,fs.error,fs.evtperpoll,fs.lostcpu,fs.lostfpga,fs.evtrate); 
  // printf("febstats,host=\"feb%d\" configd=%di,connectd=%di,evrate=%f,lostcpu=%di,lostfpga=%di,biason=%di,evtsperpoll=%di,error=%di\n",fs.mac[5],fs.configured, fs.connected,fs.evtrate,fs.lostcpu,fs.lostfpga,fs.biason,fs.evtperpoll,fs.error); 
-  sprintf(query,"febstats,host=\"feb%d\" configd=%di,connectd=%di,evrate=%f,lostcpu=%di,lostfpga=%di,biason=%di,evtsperpoll=%di,error=%di",fs.mac[5],fs.configured, fs.connected,fs.evtrate,fs.lostcpu,fs.lostfpga,fs.biason,fs.evtperpoll,fs.error); 
-  sendudp(query);
-  char mac[20];
+  int len = sprintf(query,"febstats,host=\"feb%d\" configd=%di,connectd=%di,evrate=%f,lostcpu=%di,lostfpga=%di,biason=%di,evtsperpoll=%di,error=%di",fs.mac[5],fs.configured, fs.connected,fs.evtrate,fs.lostcpu,fs.lostfpga,fs.biason,fs.evtperpoll,fs.error); 
+  sendudp(query,len);
+  //char mac[20];
   //sprintf(mac,"%02x:%02x:%02x:%02x:%02x:%02x",fs.mac[0],fs.mac[1],fs.mac[2],fs.mac[3],fs.mac[4],fs.mac[5]);
   // sprintf(query,"INSERT INTO `febs_status`(`FebSN`, `MAC`, `configured`, `connected`, `evtrate`, `lostcpu`, `lostfpga`, `biason`, `evsperpoll`, `error`) VALUES (%d,'%s',%d,%d,%f,%d,%d,%d,%d,%d)", fs.mac[5],mac,fs.configured,fs.connected,fs.evtrate,fs.lostcpu,fs.lostfpga,fs.biason,fs.evtperpoll,fs.error);
 
@@ -81,12 +82,12 @@ void updatedb_febstat()
 
 int main (int argc, char **argv)
 {
-   char *token;
-   unsigned int dummy;
-time_t t0,t1;
+  //char *token;
+  //unsigned int dummy;
+  time_t t0;//,t1;
 int dt,dt0;
 int rv=0;
-unsigned int mac[6];
+//unsigned int mac[6];
 if(argc<3 || argc>4) { usage(); return 0;}
 int period=0;
 if(argc==4) {period=atoi(argv[3]); printf("DB update period %d s.\n", period);}
@@ -118,8 +119,8 @@ zmq_msg_t reply;
 zmq_msg_init (&reply);
 t0=time(NULL);
 dt=0; dt0=0;
-int rv=0;
-char str[256*100];
+//int rv=0;
+//char str[256*100];
 void *ptr=0;
 memset(&ds, 0, sizeof(ds));
 memset(&fs, 0, sizeof(fs));
@@ -140,11 +141,11 @@ if((time(NULL)-secs)>=period) //perform DB update only once a second
  { 
   secs=time(NULL);
   ptr=(void*)zmq_msg_data (&reply);
-  memcpy(&ds,ptr, sizeof(ds)); ptr+=sizeof(ds);
+  memcpy(&ds,ptr, sizeof(ds)); ptr= (char*)ptr + sizeof(ds);
   updatedb_dstat();
   for(int i=0; i<ds.nfebs; i++)
   {
-   memcpy(&fs,ptr, sizeof(fs));ptr+=sizeof(fs);
+    memcpy(&fs,ptr, sizeof(fs)); ptr = (char*)ptr + sizeof(fs);
    updatedb_febstat();
   }
  }

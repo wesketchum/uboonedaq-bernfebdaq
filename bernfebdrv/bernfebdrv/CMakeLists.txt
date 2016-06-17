@@ -32,5 +32,9 @@ cet_make_exec(febctl
 		LIBRARIES
 		  zmq)
 
+cet_make_exec(febinfluxdb
+		LIBRARIES
+		  zmq)
+
 install_headers()
 
