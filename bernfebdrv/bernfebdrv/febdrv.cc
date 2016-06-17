@@ -1,47 +1,19 @@
-
 #include <zmq.h>
-/*
-#include <unistd.h>
-#include <stdbool.h>
-#include <arpa/inet.h>
-#include <linux/if_packet.h>
-#include <linux/ip.h>
-#include <linux/udp.h>
-#include <stdio.h>
-#include <stdint.h>
-*/
 #include <string.h>
 #include <stdlib.h>
-/*
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <net/if.h>
-#include <netinet/ether.h>
-#include <sys/timeb.h>
-#include <errno.h>
-*/
-#include "febdrv.h"
-//#include <curl/curl.h>
-
-//#include <functional>
-
 #include <iostream>
+
+#include "FEBDRV.h"
 
 void usage()
 {
-  printf("Usage: to init febdrv on eth0 interface type \n");
-  printf("febdrv eth0\n");
+  std::cout << "Usage: to init febdrv on eth0 interface type \n"
+	    << "febdrv eth0" << std::endl;
 }
 
 int main (int argc, char* argv[])
 {
-  //return 1;
   std::cout << "Starting febdrv..." << std::endl;
-  std::cout << "Starting febdrv..." << std::endl;
-  std::cout << "Starting febdrv..." << std::endl;
-  std::cout << "Starting febdrv..." << std::endl;
-  //printf("Starting febdrv...\n");
-  //sleep(2);
 
   if(argc!=2) { usage(); return 0;}
 
@@ -52,8 +24,6 @@ int main (int argc, char* argv[])
   char cmd[32]; //command string
   uint8_t buf[MAXPACKLEN];
   
-
-
   while (1) {  // main loop
 
     febdrv.pingclients();

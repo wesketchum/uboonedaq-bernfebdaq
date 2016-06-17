@@ -14,9 +14,6 @@ cet_make_exec(febdrv
 		LIBRARIES
 		  bernfebdrv_febdrv
 		  zmq)
-cet_make_exec(test_febdrv
-		LIBRARIES
-		  bernfebdrv_febdrv
-)
+
 install_headers()
 

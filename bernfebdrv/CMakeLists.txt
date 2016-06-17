@@ -38,6 +38,7 @@ cet_report_compiler_flags()
 # these are minimum required versions, not the actual product versions
 find_ups_product( cetbuildtools v3_03_00 )
 find_ups_product( gcc v4_9_2 )
+find_ups_product( TRACE v3_05_00 )
 
 # macros for art_dictionary and simple_plugin
 #include(BuildPlugins)

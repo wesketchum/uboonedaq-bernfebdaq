@@ -50,10 +50,12 @@
 #define FEB_DATA_FW 0x0504
 
 
-#define DRV_OK 0
-#define DRV_SENDERROR 1
-#define DRV_RECVERROR 2
+#define DRV_OK         0
+#define DRV_SENDERROR  1
+#define DRV_RECVERROR  2
 #define DRV_BUFOVERRUN 3
+#define DRV_INITERR    4
+
 #define MAXPACKLEN 1500
 #define MAXPAYLOAD (1500-14-4)
 
