@@ -661,6 +661,11 @@ int FEBDRV::configu(uint8_t mac5, const uint8_t *buf1, int len)
   int rv=1;
   TRACE(TR_FEBDRV_LOG,"FEBDRV::configu(%02x,buf,%d) called",mac5,len);
 
+  if(mac5==0xFF){
+    TRACE(TR_FEBDRV_ERR,"FEBDRV::configu  Cannot call configuration in broadcast mode!");
+    return 0;    
+  }
+
   if(len != (1144+224)/8){ 
     rv=0; 
     TRACE(TR_FEBDRV_ERR,"FEBDRV::configu  Bad config length: %d is not the expected %d",len,(1144+224)/8);

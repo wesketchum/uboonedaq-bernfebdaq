@@ -18,7 +18,7 @@ void usage()
 
 int main (int argc, char **argv)
 {
-time_t t0,t1;
+  time_t t0;//,t1;
 int dt,dt0;
 int rv=0;
 if(argc!=2) { usage(); return 0;}

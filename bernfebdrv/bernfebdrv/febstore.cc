@@ -24,7 +24,7 @@ char * iface;
 char * filename;
 char sim[4]={'|','/','-','\\'};
 int isim=0;
-time_t t0,t1;
+ time_t t0;//,t1;
 int dt,dt0;
 if(argc!=3) { usage(); return 0;}
 iface=argv[1];
@@ -34,7 +34,7 @@ void * context = zmq_ctx_new ();
 //  Socket to talk to server
 printf ("Connecting to febdrv at %s...\n",iface);
 void *subscriber = zmq_socket (context, ZMQ_SUB);
-if(subscriber<=0) { printf("Can't initialize the socket!\n"); return 0;}
+if(!subscriber) { printf("Can't initialize the socket!\n"); return 0;}
 rv=zmq_connect (subscriber, iface);
 if(rv<0) { printf("Can't connect to the socket!\n"); return 0;}
 //zmq_connect (subscriber, "ipc://stats");

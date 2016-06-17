@@ -29,7 +29,7 @@ class FEBCONF{
   void SetSCRConf(const char*);
   void SetPMRConf(const char*);
 
-  void SendConfs(uint8_t const&);
+  void SendConfs(uint8_t const&, char*);
 
   bool configOK() const { return (config_SCR_OK_ && config_PMR_OK_); }
   

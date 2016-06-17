@@ -32,7 +32,7 @@ printf ("Connecting to febdrv...\n");
 void *requester = zmq_socket (context, ZMQ_REQ);
 rv=zmq_connect (requester, argv[1]); if(rv<0) {printf("Connection to %s failed!\n",argv[1]); return 0;}
 //zmq_connect (requester, "ipc://command");
-int request_nbr;
+//int request_nbr;
 zmq_msg_t request;
 zmq_msg_init_size (&request, 9);
 memcpy(zmq_msg_data (&request), argv[2],7);
