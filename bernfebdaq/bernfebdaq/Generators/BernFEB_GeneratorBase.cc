@@ -148,17 +148,9 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
     return false;
   }
 
-  BernFEBFragmentMetadata metadata(feb.next_time_start,
-				   feb.next_time_start+SequenceTimeWindowSize_,
-				   RunNumber_,
-				   feb.next_time_start/SubrunTimeWindowSize_,
-				   feb.next_time_start/SequenceTimeWindowSize_ + 1,
-				   feb_id, ReaderID_,
-				   nChannels_,nADCBits_);
   TRACE(TR_FF_DEBUG,
 	"\tBernFeb::FillFragment() : Look for data, id=0x%lx, time=[%ld,%ld]",
 	feb_id,feb.next_time_start,feb.next_time_start+SequenceTimeWindowSize_);
-  //std::cout << metadata << std::endl;
 				   
   int64_t time = 0;
   size_t  local_time_resets = 0;
@@ -206,6 +198,16 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
 
   //ok, queue was non-empty, and we saw our last event. Need to loop through and do proper accounting now.
+
+  //make metadata object
+  BernFEBFragmentMetadata metadata(feb.next_time_start,
+				   feb.next_time_start+SequenceTimeWindowSize_,
+				   RunNumber_,
+				   feb.next_time_start/SubrunTimeWindowSize_,
+				   feb.next_time_start/SequenceTimeWindowSize_ + 1,
+				   feb_id, ReaderID_,
+				   nChannels_,nADCBits_);
+
   local_time_resets = 0;
   local_last_time = feb.last_time_counter;
   for(auto it=it_start_fragment; it!=it_end_fragment; ++it){
