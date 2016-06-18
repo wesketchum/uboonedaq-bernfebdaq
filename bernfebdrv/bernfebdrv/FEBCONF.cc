@@ -62,7 +62,7 @@ void FEBCONF::SetSCRConf(const char* scrf){
 void FEBCONF::SetPMRConf(const char* pmrf){
   int bitlen = readbitstream(pmrf,bufPMR);
 
-  if(bitlen==1144){
+  if(bitlen==224){
     TRACE(TR_FEBCONF_LOG,"FEBDTP::SetPMRConf  %d bits read from PMR config file %s.\n",bitlen,pmrf);
     config_PMR_OK_ = true;
   }

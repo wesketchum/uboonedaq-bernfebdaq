@@ -350,7 +350,7 @@ int FEBDRV::recvfromfeb(int timeout_us, FEBDTP_PKT_t & rcvrpkt) //result is in r
   
   if (numbytes<=0) {
     driver_state=DRV_RECVERROR;
-    TRACE(TR_FEBDRV_ERR,"FEBDRV::recvfeb(cmd=%u,mac5=%2X) : nbytes=%d error",rcvrpkt.CMD,rcvrpkt.src_mac[5],numbytes);
+    //TRACE(TR_FEBDRV_ERR,"FEBDRV::recvfeb(cmd=%u,mac5=%2X) : nbytes=%d error",rcvrpkt.CMD,rcvrpkt.src_mac[5],numbytes);
     return 0;
   } //timeout
 

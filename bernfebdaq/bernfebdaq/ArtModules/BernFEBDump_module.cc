@@ -35,12 +35,14 @@ public:
 
 private:
   std::string raw_data_label_;
+  int         verbosity_;
 };
 
 
 bernfebdaq::BernFEBDump::BernFEBDump(fhicl::ParameterSet const & pset)
   : EDAnalyzer(pset),
-    raw_data_label_(pset.get<std::string>("raw_data_label"))
+    raw_data_label_(pset.get<std::string>("raw_data_label")),
+    verbosity_(pset.get<int>("verbosity",2))
 {
 }
 
@@ -70,19 +72,29 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
     return;
   }
   
-  
-  std::cout << "######################################################################" << std::endl;
-  std::cout << std::endl;
-  std::cout << "Run " << evt.run() << ", subrun " << evt.subRun()
-	    << ", event " << eventNumber << " has " << raw->size()
-	    << " BernFEB fragment(s)." << std::endl;
-  
+  if(verbosity_>0){
+    std::cout << "######################################################################" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Run " << evt.run() << ", subrun " << evt.subRun()
+	      << ", event " << eventNumber << " has " << raw->size()
+	      << " BernFEB fragment(s)." << std::endl;
+  }  
   for (size_t idx = 0; idx < raw->size(); ++idx) {
     const auto& frag((*raw)[idx]);
     
     BernFEBFragment bb(frag);
+    auto bbm = bb.metadata();
 
-    std::cout << bb << std::endl;
+    if(verbosity_==1)
+      std::cout << "\tFragment ID=0x" << std::hex << bbm->feb_id() << std::dec
+		<< " Time=[" << bbm->time_start() << "," << bbm->time_end() << ")"
+		<< " (Events,Missed,Overwritten)=(" << bbm->n_events() << "," 
+		<< bbm->missed_events() << "," << bbm->overwritten_events() << ")"
+		<< std::endl;
+    else if(verbosity_==2)
+      std::cout << bbm << std::endl;
+    else if(verbosity_>2)
+      std::cout << bb << std::endl;
   }
 }
 

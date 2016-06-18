@@ -149,7 +149,7 @@ int main(int argc, char * argv[]) try
 
       std::cout << "Fragment: Seq ID: " << val->sequenceID() << ", Frag ID: " << val->fragmentID() << ", total size in bytes: " << val->size() * sizeof(artdaq::RawDataType) << std::endl;
 
-      if (val->sequenceID() != previous_sequence_id) {
+      if (val->sequenceID() > previous_sequence_id) {
         ++event_count;
         previous_sequence_id = val->sequenceID();
       }

@@ -232,9 +232,9 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	"BernFeb::FillFragment() : Fragment prepared. Metadata:%s",
 	metadata.c_str());
 
-  //great, now add the fragment on the end.
+  //great, now add the fragment on the end.`<
   frags.emplace_back( artdaq::Fragment::FragmentBytes(metadata.n_events()*sizeof(BernFEBEvent),  
-						      metadata.sequence_number(),ReaderID_,
+						      metadata.sequence_number(),feb_id,
 						      bernfebdaq::detail::FragmentType::BernFEB, metadata) );
   std::copy(it_start_fragment,it_end_fragment,(BernFEBEvent*)(frags.back()->dataBegin()));
 

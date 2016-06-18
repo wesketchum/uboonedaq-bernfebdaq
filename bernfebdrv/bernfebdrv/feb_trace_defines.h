@@ -10,13 +10,13 @@
 
  *****/
 
-#define TR_FEBDRV_ERR     32
-#define TR_FEBDRV_WARN    33
-#define TR_FEBDRV_LOG     34
-#define TR_FEBDRV_DEBUG   35
+#define TR_FEBDRV_ERR     12
+#define TR_FEBDRV_WARN    13
+#define TR_FEBDRV_LOG     14
+#define TR_FEBDRV_DEBUG   15
 
-#define TR_FEBCONF_ERR     36
-#define TR_FEBCONF_WARN    37
-#define TR_FEBCONF_LOG     38
-#define TR_FEBCONF_DEBUG   39
+#define TR_FEBCONF_ERR     16
+#define TR_FEBCONF_WARN    17
+#define TR_FEBCONF_LOG     18
+#define TR_FEBCONF_DEBUG   19
 
