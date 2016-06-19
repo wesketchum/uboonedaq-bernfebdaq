@@ -18,4 +18,4 @@ mkdir -p $BUILD_DIR
 
 echo changing directory to $BUILD_DIR
 cd $BUILD_DIR  # note: next line adjusts PATH based one cwd
-. $REPO_DIR/ups/setup_for_development -p 
+. $REPO_DIR/ups/setup_for_development ${SETUP_FLAGS:="-p"}

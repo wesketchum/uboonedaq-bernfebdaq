@@ -125,11 +125,18 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, n_events=%lu",id,this_n_events);
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, buffer_size=%lu",id,FEBDequeBuffers_[id].buffer.size());
 
+    std::stringstream ss_id;
+    ss_id << "0x" << std::hex << (id & 0xffff) << std::dec;
+
+    metricMan_->sendMetric("EventsAdded_"+ss_id.str(),this_n_events,"events",5,false);
+    metricMan_->sendMetric("BufferOccupancy_"+ss_id.str(),FEBDequeBuffers_[id].buffer.size(),"events",5,false);
   }
   
   TRACE(TR_GD_LOG,"BernFeb::GetData() completed, n_events=%lu",n_events);
 
   GetDataComplete();
+
+  metricMan_->sendMetric("TotalEventsAdded",n_events,"events",5,false);
 
   if(n_events>0) return true;
   return false;

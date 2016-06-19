@@ -2,7 +2,7 @@
 #  about the FHiCL language, please look at
 #  cdcvs.fnal.gov/redmine/documents/327 , the "FHiCL Quick Start Guide"
 
-events_to_generate: 500
+events_to_generate: 50000
 run_number: 101
 
 fragment_receiver: {
@@ -37,6 +37,23 @@ fragment_receiver: {
    time_increment_per_event: 897897
    events_per_packet: 10
 
+   metrics: {
+     graphite:{
+       level: 5
+       metricPluginType: "graphite"
+       host: "localhost"
+       port: "8080"
+       namespace: "artdaq.FragmentGenerator."
+     }
+     verbosefile: {
+       level: 5
+       metricPluginType: "file"
+       fileMode: "Overwrite"
+       fileName: "/tmp/FileMetric_%UID%.verbose.out"
+       uniquify: true
+     }
+   }
+
 }  		  
 
 event_builder: {
@@ -46,6 +63,24 @@ event_builder: {
   print_event_store_stats: true
   verbose: true
   events_expected_in_SimpleQueueReader: @local::events_to_generate
+
+   metrics: {
+     graphite:{
+       level: 5
+       metricPluginType: "graphite"
+       host: "localhost"
+       port: "8080"
+       namespace: "artdaq.evb."
+     }
+     verbosefile: {
+       level: 5
+       metricPluginType: "file"
+       fileMode: "Overwrite"
+       fileName: "/tmp/FileMetricEVB_%UID%.verbose.out"
+       uniquify: true
+     }
+   }
+
 }
 
 ######################################################################

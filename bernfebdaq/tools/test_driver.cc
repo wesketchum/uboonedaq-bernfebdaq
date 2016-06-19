@@ -16,8 +16,10 @@
 #include "artdaq/Application/CommandableFragmentGenerator.hh"
 #include "artdaq/Application/makeCommandableFragmentGenerator.hh"
 #include "artdaq/DAQrate/EventStore.hh"
+#include "artdaq/DAQrate/MetricManager.hh"
 #include "artdaq-core/Core/SimpleQueueReader.hh"
 #include "artdaq-core/Utilities/SimpleLookupPolicy.h"
+#include "artdaq-utilities/Plugins/makeMetricPlugin.hh"
 #include "cetlib/container_algorithms.h"
 #include "cetlib/filepath_maker.h"
 #include "fhiclcpp/ParameterSet.h"
@@ -30,6 +32,7 @@
 #include <memory>
 #include <utility>
 #include <limits>
+#include <string>
 
 using namespace fhicl;
 namespace  bpo = boost::program_options;
@@ -92,6 +95,9 @@ int main(int argc, char * argv[]) try
 
   make_ParameterSet(vm["config"].as<std::string>(), lookup_policy, complete_pset);
 
+  artdaq::MetricManager* fr_metricManPtr  = nullptr;
+  artdaq::MetricManager* evb_metricManPtr = nullptr;
+
   ParameterSet fragment_receiver_pset = complete_pset.get<ParameterSet>("fragment_receiver");
   ParameterSet event_builder_pset = complete_pset.get<ParameterSet>("event_builder");
 
@@ -101,7 +107,33 @@ int main(int argc, char * argv[]) try
   std::unique_ptr<artdaq::CommandableFragmentGenerator> const
     gen(artdaq::makeCommandableFragmentGenerator(fragment_receiver_pset.get<std::string>("generator"),
 						 fragment_receiver_pset));
+  
+  ParameterSet metric_pset = fragment_receiver_pset.get<ParameterSet>("metrics");
 
+  std::vector<std::string> names = metric_pset.get_pset_keys();
+  for(auto name : names){
+    std::cout << "Metric: " << name << "." << std::endl;
+    ParameterSet plugin_pset = metric_pset.get<ParameterSet>(name);
+    std::cout << "\t type=" << plugin_pset.get<std::string>("metricPluginType","ERROR") << std::endl;
+    auto mtrplgin = artdaq::makeMetricPlugin(plugin_pset.get<std::string>("metricPluginType",""),plugin_pset);
+    std::cout << "\t plugin=" << mtrplgin->getLibName() << std::endl;
+  }
+  std::string nmspc = fragment_receiver_pset.get<std::string>("generator");// nmspc.append(".");
+  std::cout << "MADE IT HERE!   nmspc=" << nmspc << std::endl;
+  fr_metricManPtr->setPrefix(nmspc);
+  std::cout << "PREFIX SET!   nmspc=" << nmspc << std::endl;
+
+  //  if(fragment_receiver_pset.get_if_present<ParameterSet>("metrics",metric_pset)){
+  fr_metricManPtr->initialize(metric_pset,nmspc);
+  //gen.get()->SetMetricManager(fr_metricManPtr);
+  //}
+
+  std::cout << "MADE IT HERE TOO!   nmspc=" << nmspc << std::endl;
+
+  /*
+  if(event_builder_pset.get_if_present<ParameterSet>("metrics",metric_pset))
+    evb_metricManPtr->initialize(metric_pset,"EventBuilder.");
+  */
   // The instance of the artdaq::EventStore object can either pass
   // events to a thread running Art, or to a small executable called
   // "SimpleQueueReader"
@@ -130,7 +162,9 @@ int main(int argc, char * argv[]) try
                            1,
                            es_argc,
                            es_argv,
-                           es_fcn);
+                           es_fcn,
+			   evb_metricManPtr);
+
 
   int events_to_generate = complete_pset.get<int>("events_to_generate", 0);
   int event_count = 0;
@@ -138,6 +172,9 @@ int main(int argc, char * argv[]) try
 
   uint64_t timeout = 45;
   uint64_t timestamp = std::numeric_limits<uint64_t>::max();
+
+  //fr_metricMan.do_start();
+  //evb_metricManPtr->do_start();
 
   gen.get ()->StartCmd (complete_pset.get<artdaq::EventStore::run_id_t>("run_number"), timeout, timestamp);
 
@@ -149,13 +186,13 @@ int main(int argc, char * argv[]) try
 
       std::cout << "Fragment: Seq ID: " << val->sequenceID() << ", Frag ID: " << val->fragmentID() << ", total size in bytes: " << val->size() * sizeof(artdaq::RawDataType) << std::endl;
 
-      if (val->sequenceID() > previous_sequence_id) {
+      if (val->sequenceID() != previous_sequence_id) {
         ++event_count;
         previous_sequence_id = val->sequenceID();
       }
-      if (events_to_generate != 0 && event_count > events_to_generate) 
+      if (events_to_generate != 0 && event_count > events_to_generate) {
 	gen.get ()->StopCmd (timeout, timestamp);
-
+      }
       store.insert(std::move(val));
     }
     frags.clear();
@@ -164,6 +201,8 @@ int main(int argc, char * argv[]) try
       gen.get ()->StopCmd (timeout, timestamp);
 
   }
+  //fr_metricMan.do_stop();
+  //evb_metricManPtr->do_stop();
 
   int readerReturnValue;
   bool endSucceeded = false;

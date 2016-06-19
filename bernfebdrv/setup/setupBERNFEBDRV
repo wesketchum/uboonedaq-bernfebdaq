@@ -15,4 +15,4 @@ mkdir -p $BERNFEBDRV_BUILD
 
 echo changing directory to $BERNFEBDRV_BUILD
 cd $BERNFEBDRV_BUILD  # note: next line adjusts PATH based one cwd
-. $BERNFEBDRV_REPO/ups/setup_for_development -p 
+. $BERNFEBDRV_REPO/ups/setup_for_development ${SETUP_FLAGS:="-p"}
