@@ -2,7 +2,7 @@
 #  about the FHiCL language, please look at
 #  cdcvs.fnal.gov/redmine/documents/327 , the "FHiCL Quick Start Guide"
 
-events_to_generate: 50000
+events_to_generate: 5000000
 run_number: 101
 
 fragment_receiver: {
@@ -23,8 +23,8 @@ fragment_receiver: {
    nADCBits: 12
    nChannels: 32
    ReaderID: 0x1
-   #FEBIDs : [ 0x1234567, 0x2345678, 0x3456789, 0x456789a, 0x56789ab ]
-   FEBIDs : [0x1234567]
+   FEBIDs : [ 0x1234567, 0x2345678, 0x3456789, 0x456789a, 0x56789ab ]
+   #FEBIDs : [0x1234567]
 
    FEBDequeBufferCapacity: 5e3
    FEBDTPBufferCapacity: 1024
@@ -58,20 +58,20 @@ fragment_receiver: {
 
 event_builder: {
 
-  expected_fragments_per_event: 1
+  expected_fragments_per_event: 5
   use_art: true
   print_event_store_stats: true
   verbose: true
   events_expected_in_SimpleQueueReader: @local::events_to_generate
 
    metrics: {
-     graphite:{
-       level: 5
-       metricPluginType: "graphite"
-       host: "localhost"
-       port: "8080"
-       namespace: "artdaq.evb."
-     }
+#     graphite:{
+#       level: 5
+#       metricPluginType: "graphite"
+#       host: "localhost"
+#       port: "8080"
+#       namespace: "artdaq.evb."
+#     }
      verbosefile: {
        level: 5
        metricPluginType: "file"

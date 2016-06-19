@@ -95,7 +95,7 @@ int main(int argc, char * argv[]) try
 
   make_ParameterSet(vm["config"].as<std::string>(), lookup_policy, complete_pset);
 
-  artdaq::MetricManager* fr_metricManPtr  = nullptr;
+  artdaq::MetricManager fr_metricMan;//Ptr  = nullptr;
   artdaq::MetricManager* evb_metricManPtr = nullptr;
 
   ParameterSet fragment_receiver_pset = complete_pset.get<ParameterSet>("fragment_receiver");
@@ -120,12 +120,12 @@ int main(int argc, char * argv[]) try
   }
   std::string nmspc = fragment_receiver_pset.get<std::string>("generator");// nmspc.append(".");
   std::cout << "MADE IT HERE!   nmspc=" << nmspc << std::endl;
-  fr_metricManPtr->setPrefix(nmspc);
+  fr_metricMan.setPrefix(nmspc);
   std::cout << "PREFIX SET!   nmspc=" << nmspc << std::endl;
 
   //  if(fragment_receiver_pset.get_if_present<ParameterSet>("metrics",metric_pset)){
-  fr_metricManPtr->initialize(metric_pset,nmspc);
-  //gen.get()->SetMetricManager(fr_metricManPtr);
+  fr_metricMan.initialize(metric_pset,nmspc);
+  gen.get()->SetMetricManager(&fr_metricMan);
   //}
 
   std::cout << "MADE IT HERE TOO!   nmspc=" << nmspc << std::endl;
@@ -173,7 +173,7 @@ int main(int argc, char * argv[]) try
   uint64_t timeout = 45;
   uint64_t timestamp = std::numeric_limits<uint64_t>::max();
 
-  //fr_metricMan.do_start();
+  fr_metricMan.do_start();
   //evb_metricManPtr->do_start();
 
   gen.get ()->StartCmd (complete_pset.get<artdaq::EventStore::run_id_t>("run_number"), timeout, timestamp);
@@ -201,7 +201,7 @@ int main(int argc, char * argv[]) try
       gen.get ()->StopCmd (timeout, timestamp);
 
   }
-  //fr_metricMan.do_stop();
+  fr_metricMan.do_stop();
   //evb_metricManPtr->do_stop();
 
   int readerReturnValue;
