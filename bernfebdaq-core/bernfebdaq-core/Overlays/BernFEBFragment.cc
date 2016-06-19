@@ -74,3 +74,22 @@ bool bernfebdaq::BernFEBFragment::Verify() const {
   return verified;
     
 }
+
+std::string bernfebdaq::BernFEBEvent::db_entry() const {
+
+  std::stringstream ss_tags,ss_data;
+  ss_tags << "time1_ref=" << time1.IsReference() << ",";
+  ss_tags << "time2_ref=" << time2.IsReference() << ",";
+  ss_tags << "time1_ovfl=" << time1.IsOverflow() << ",";
+  ss_tags << "time2_ovfl=" << time2.IsOverflow() << ",";
+
+  ss_data << "overwritten=" << flags.overwritten << ",";
+  ss_data << "missed=" << flags.missed << ",";
+  ss_data << "time1=" << time1.Time() << ",";
+  ss_data << "time2=" << time2.Time() << ",";
+  for(size_t i=0; i<32; ++i)
+    ss_data << "ch" << i << "=" << adc[i] << ",";
+
+
+  return (ss_tags.str()+" "+ss_data.str());
+}

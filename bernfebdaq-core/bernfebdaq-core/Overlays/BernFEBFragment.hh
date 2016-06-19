@@ -145,6 +145,7 @@ struct bernfebdaq::BernFEBEvent{
   uint16_t adc[32];
 
   const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
+  std::string db_entry() const;
 
 };
 
