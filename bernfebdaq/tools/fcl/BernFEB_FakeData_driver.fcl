@@ -38,13 +38,13 @@ fragment_receiver: {
    events_per_packet: 10
 
    metrics: {
-     graphite:{
-       level: 5
-       metricPluginType: "graphite"
-       host: "localhost"
-       port: "8080"
-       namespace: "artdaq.FragmentGenerator."
-     }
+#     graphite:{
+#       level: 5
+#       metricPluginType: "graphite"
+#       host: "localhost"
+#       port: "8080"
+#       namespace: "artdaq.FragmentGenerator."
+#     }
      verbosefile: {
        level: 5
        metricPluginType: "file"
@@ -65,13 +65,13 @@ event_builder: {
   events_expected_in_SimpleQueueReader: @local::events_to_generate
 
    metrics: {
-     graphite:{
-       level: 5
-       metricPluginType: "graphite"
-       host: "localhost"
-       port: "8080"
-       namespace: "artdaq.evb."
-     }
+#     graphite:{
+#       level: 5
+#       metricPluginType: "graphite"
+#       host: "localhost"
+#       port: "8080"
+#       namespace: "artdaq.evb."
+#     }
      verbosefile: {
        level: 5
        metricPluginType: "file"

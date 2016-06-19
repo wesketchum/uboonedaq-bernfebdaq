@@ -3,8 +3,8 @@
 
 #include "bernfebdaq/Generators/BernFEB_GeneratorBase.hh"
 
-#include "bernfebdrv/febdrv.h"
-#include "bernfebdrv/febconf.h"
+#include "bernfebdrv/FEBDRV.h"
+#include "bernfebdrv/FEBCONF.h"
 
 namespace bernfebdaq {    
 
