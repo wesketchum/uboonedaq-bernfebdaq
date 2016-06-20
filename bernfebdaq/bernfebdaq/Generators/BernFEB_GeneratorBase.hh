@@ -91,6 +91,9 @@ namespace bernfebdaq {
 
     bool GetData();
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
+    std::string GetFEBIDString(uint64_t id) const;
+    void SendMetadataMetrics(BernFEBFragmentMetadata const& m);
+    void SendBufferOccupancyMetrics(uint64_t id) const;
     
     WorkerThreadUPtr GetData_thread_;
 

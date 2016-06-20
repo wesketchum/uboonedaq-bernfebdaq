@@ -110,6 +110,34 @@ bernfebdaq::BernFEB_GeneratorBase::~BernFEB_GeneratorBase(){
   TRACE(TR_LOG,"BernFeb destructor completed");  
 }
 
+std::string bernfebdaq::BernFEB_GeneratorBase::GetFEBIDString(uint64_t id) const{
+  std::stringstream ss_id;
+  ss_id << "0x" << std::hex << std::setw(12) << std::setfill('0') << (id & 0xffffffffffff);
+  return ss_id.str();
+}
+
+void bernfebdaq::BernFEB_GeneratorBase::SendBufferOccupancyMetrics(uint64_t id) const {
+
+  std::string id_str;
+  float occupied_frac;
+
+  if(id!=0){
+    id_str = GetFEBIDString(id);
+    occupied_frac = (float)(FEBDequeBuffers_.at(id).buffer.size()) / (float)(FEBDequeBufferCapacity_);
+    metricMan_->sendMetric("BufferOccupancy_"+id_str,FEBDequeBuffers_.at(id).buffer.size(),"events",5,true);    
+    metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,occupied_frac*100.,"%",5,true);    
+  }
+  else{
+    for( auto const& buf : FEBDequeBuffers_){
+      id_str = GetFEBIDString(buf.first);
+      occupied_frac = (float)(buf.second.buffer.size()) / (float)(FEBDequeBufferCapacity_);
+      metricMan_->sendMetric("BufferOccupancy_"+id_str,buf.second.buffer.size(),"events",5,true);    
+      metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,occupied_frac*100.,"%",5,true);    
+    }
+  }
+
+}
+
 bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 {
   TRACE(TR_GD_LOG,"BernFeb::GetData() called");
@@ -125,18 +153,17 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, n_events=%lu",id,this_n_events);
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, buffer_size=%lu",id,FEBDequeBuffers_[id].buffer.size());
 
-    std::stringstream ss_id;
-    ss_id << "0x" << std::hex << (id & 0xffff) << std::dec;
+    auto id_str = GetFEBIDString(id);
 
-    metricMan_->sendMetric("EventsAdded_"+ss_id.str(),this_n_events,"events",5,false);
-    metricMan_->sendMetric("BufferOccupancy_"+ss_id.str(),FEBDequeBuffers_[id].buffer.size(),"events",5,false);
+    metricMan_->sendMetric("EventsAdded_"+id_str,this_n_events,"events",5,true);
+    SendBufferOccupancyMetrics(id);
   }
   
   TRACE(TR_GD_LOG,"BernFeb::GetData() completed, n_events=%lu",n_events);
 
   GetDataComplete();
 
-  metricMan_->sendMetric("TotalEventsAdded",n_events,"events",5,false);
+  metricMan_->sendMetric("TotalEventsAdded",n_events,"events",5,true);
 
   if(n_events>0) return true;
   return false;
@@ -256,7 +283,25 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size after erase = %lu",feb.buffer.size());
   //std::cout << "New first fragment has time " << feb.buffer.cbegin()->time1 << std::endl;
 
+  auto id_str = GetFEBIDString(feb_id);
+  metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,false,true);
+  SendBufferOccupancyMetrics(feb_id);
+  SendMetadataMetrics(metadata);
+
   return true;
+}
+
+void bernfebdaq::BernFEB_GeneratorBase::SendMetadataMetrics(BernFEBFragmentMetadata const& m) {
+  auto id_str = GetFEBIDString(m.feb_id());
+  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end()),"ns",5,true,false);
+  //metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true);
+  //metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5);
+  metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5);
+  float eff=1.0;
+  if((m.n_events()+m.missed_events()+m.overwritten_events())!=0)
+    eff = (float)(m.n_events()) / (float)(m.n_events()+m.missed_events()+m.overwritten_events());
+
+  metricMan_->sendMetric("Efficiency_"+id_str,eff*100.,"%",5);
 }
 
 bool bernfebdaq::BernFEB_GeneratorBase::getNext_(artdaq::FragmentPtrs & frags) {

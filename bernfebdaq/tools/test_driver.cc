@@ -129,10 +129,10 @@ int main(int argc, char * argv[]) try
   //}
 
   std::cout << "MADE IT HERE TOO!   nmspc=" << nmspc << std::endl;
-
+  /*
   if(event_builder_pset.get_if_present<ParameterSet>("metrics",metric_pset))
     evb_metricManPtr->initialize(metric_pset,"EventBuilder.");
-  
+  */
   // The instance of the artdaq::EventStore object can either pass
   // events to a thread running Art, or to a small executable called
   // "SimpleQueueReader"
