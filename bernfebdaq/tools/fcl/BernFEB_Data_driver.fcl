@@ -2,7 +2,7 @@
 #  about the FHiCL language, please look at
 #  cdcvs.fnal.gov/redmine/documents/327 , the "FHiCL Quick Start Guide"
 
-events_to_generate: 5000
+events_to_generate: 500000
 run_number: 101
 
 fragment_receiver: {
@@ -26,7 +26,7 @@ fragment_receiver: {
    #FEBIDs : [ 0x1234567, 0x2345678, 0x3456789, 0x456789a, 0x56789ab ]
    #FEBIDs : [0x1234567]
    #FEBIDs : [ 0x603712342e, 0x603712342f, 0x6037123430, 0x6037123431, 0x6037123432, 0x6037123433, 0x6037123434, 0x6037123435, 0x6037123436, 0x6037123437, 0x6037123438, 0x6037123439, 0x603712343a, 0x6037123440, 0x6037123441 ]
-   FEBIDs : [ 0x603712342f, 0x6037123431, 0x6037123433, 0x6037123434, 0x6037123435, 0x6037123436, 0x6037123437, 0x6037123438, 0x6037123439, 0x603712343a, 0x6037123441 ]
+   FEBIDs : [ 0x603712342f, 0x6037123431, 0x6037123433, 0x603712342e, 0x6037123430, 0x6037123432 ]
    FEBDequeBufferCapacity: 10e3
    FEBDTPBufferCapacity: 1024
 
@@ -38,11 +38,28 @@ fragment_receiver: {
    #throttle_usecs: 2e6
    #throttle_usecs_check: 1e6
 
+   metrics: {
+     graphite:{
+       level: 5
+       metricPluginType: "graphite"
+       host: "localhost"
+       #port: "8080"
+       namespace: "artdaq.FragmentGenerator."
+     }
+     verbosefile: {
+       level: 5
+       metricPluginType: "file"
+       fileMode: "Overwrite"
+       fileName: "/tmp/FileMetric_%UID%.verbose.out"
+       uniquify: true
+     }
+   }
+
 }  		  
 
 event_builder: {
 
-  expected_fragments_per_event: 11
+  expected_fragments_per_event: 6
   use_art: true
   print_event_store_stats: true
   verbose: true
