@@ -42,7 +42,7 @@ fragment_receiver: {
        level: 5
        metricPluginType: "graphite"
        host: "localhost"
-       port: "8080"
+       #port: "8080"
        namespace: "artdaq.FragmentGenerator."
      }
      verbosefile: {
