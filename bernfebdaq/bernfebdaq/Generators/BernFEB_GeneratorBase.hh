@@ -73,34 +73,40 @@ namespace bernfebdaq {
     uint32_t FEBDTPBufferSizeBytes_;
 
     typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
+    //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
   private:
     typedef struct FEBBuffer{
-      FEBEventBuffer_t buffer;
-      std::mutex       buffer_mutex;
-      size_t           time_resets;
-      int64_t          next_time_start;
-      uint32_t         overwritten_counter;
-      int32_t          last_time_counter;
-      FEBBuffer(uint32_t capacity)
+
+      FEBEventBuffer_t             buffer;
+      std::unique_ptr<std::mutex>  mutexptr;
+      size_t                       time_resets;
+      int64_t                      next_time_start;
+      uint32_t                     overwritten_counter;
+      int32_t                      last_time_counter;
+      uint64_t                     id;
+
+      FEBBuffer(uint32_t capacity, uint64_t i)
 	: buffer(FEBEventBuffer_t(capacity)),
+	  mutexptr(new std::mutex),
 	  time_resets(0),
 	  next_time_start(0),
 	  overwritten_counter(0),
-	  last_time_counter(-1)
-      { buffer.clear(); }
-      FEBBuffer() { FEBBuffer(0); }
-      FEBBuffer& operator=(const FEBBuffer& b){
-	  buffer = b.buffer;
-	  time_resets = b.time_resets;
-	  next_time_start = b.next_time_start;
-	  overwritten_counter = b.overwritten_counter;
-	  last_time_counter = b.last_time_counter;
-	  return *this;
+	  last_time_counter(-1),
+	  id(i)
+      { Init(); }
+      FEBBuffer() { FEBBuffer(0,0); }
+      void Init() {
+	buffer.clear();
+	mutexptr->unlock();
+	time_resets = 0;
+	next_time_start = 0;
+	overwritten_counter = 0;
+	last_time_counter = 0;
       }
     } FEBBuffer_t;
 
-    std::unordered_map< uint64_t, FEBBuffer_t > FEBBuffers_;
+    std::unordered_map< uint64_t, FEBBuffer_t  > FEBBuffers_;
     uint32_t FEBBufferCapacity_;
     uint32_t FEBBufferSizeBytes_;
 
