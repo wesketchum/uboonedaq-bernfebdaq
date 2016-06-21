@@ -1,15 +1,10 @@
 #include "bernfebdaq/Generators/BernFEB_GeneratorBase.hh"
 
 #include "art/Utilities/Exception.h"
-//#include "artdaq/Application/GeneratorMacros.hh"
 #include "cetlib/exception.h"
 #include "bernfebdaq-core/Overlays/FragmentType.hh"
 #include "fhiclcpp/ParameterSet.h"
 #include "artdaq-core/Utilities/SimpleLookupPolicy.h"
-
-//#include "CAENComm.h"
-//#include "keyb.h"
-//#include "keyb.c"
 
 #include "trace_defines.h"
 
@@ -44,8 +39,8 @@ void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
   ReaderID_ = ps_.get<uint8_t>("ReaderID",0x1);
   FEBIDs_ = ps_.get< std::vector<uint64_t> >("FEBIDs");
 
-  FEBDequeBufferCapacity_ = ps_.get<uint32_t>("FEBDequeBufferCapacity",5e3);
-  FEBDequeBufferSizeBytes_ = FEBDequeBufferCapacity_*sizeof(BernFEBEvent);
+  FEBBufferCapacity_ = ps_.get<uint32_t>("FEBBufferCapacity",5e3);
+  FEBBufferSizeBytes_ = FEBBufferCapacity_*sizeof(BernFEBEvent);
 
   FEBDTPBufferCapacity_ = ps_.get<uint32_t>("FEBDTPBufferCapacity",1024);
   FEBDTPBufferSizeBytes_ = FEBDTPBufferCapacity_*sizeof(BernFEBEvent);
@@ -76,8 +71,8 @@ void bernfebdaq::BernFEB_GeneratorBase::start() {
 
   ConfigureStart();
   for(auto const& id : FEBIDs_)
-    FEBDequeBuffers_[id] = FEBBuffer_t();
-  TRACE(TR_DEBUG,"\tMade %lu FEBDequeBuffers",FEBIDs_.size());
+    FEBBuffers_[id] = FEBBuffer_t(FEBBufferCapacity_);
+  TRACE(TR_DEBUG,"\tMade %lu FEBBuffers",FEBIDs_.size());
 
   FEBDTPBufferUPtr.reset(new BernFEBEvent[FEBDTPBufferCapacity_]);
 
@@ -110,32 +105,37 @@ bernfebdaq::BernFEB_GeneratorBase::~BernFEB_GeneratorBase(){
   TRACE(TR_LOG,"BernFeb destructor completed");  
 }
 
-std::string bernfebdaq::BernFEB_GeneratorBase::GetFEBIDString(uint64_t id) const{
+std::string bernfebdaq::BernFEB_GeneratorBase::GetFEBIDString(uint64_t const& id) const{
   std::stringstream ss_id;
   ss_id << "0x" << std::hex << std::setw(12) << std::setfill('0') << (id & 0xffffffffffff);
   return ss_id.str();
 }
 
-void bernfebdaq::BernFEB_GeneratorBase::SendBufferOccupancyMetrics(uint64_t id) const {
+void bernfebdaq::BernFEB_GeneratorBase::UpdateBufferOccupancyMetrics(uint64_t const& id,
+								     size_t const& buffer_size) const {
 
-  std::string id_str;
-  float occupied_frac;
+  std::string id_str = GetFEBIDString(id);
+  metricMan_->sendMetric("BufferOccupancy_"+id_str,buffer_size,"events",5,true);    
+  metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,
+			 ((float)(FEBBuffers_.at(id).buffer.size()) / (float)(FEBBufferCapacity_))*100.,
+			 "%",5,true);    
+}
 
-  if(id!=0){
-    id_str = GetFEBIDString(id);
-    occupied_frac = (float)(FEBDequeBuffers_.at(id).buffer.size()) / (float)(FEBDequeBufferCapacity_);
-    metricMan_->sendMetric("BufferOccupancy_"+id_str,FEBDequeBuffers_.at(id).buffer.size(),"events",5,true);    
-    metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,occupied_frac*100.,"%",5,true);    
-  }
-  else{
-    for( auto const& buf : FEBDequeBuffers_){
-      id_str = GetFEBIDString(buf.first);
-      occupied_frac = (float)(buf.second.buffer.size()) / (float)(FEBDequeBufferCapacity_);
-      metricMan_->sendMetric("BufferOccupancy_"+id_str,buf.second.buffer.size(),"events",5,true);    
-      metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,occupied_frac*100.,"%",5,true);    
-    }
-  }
+size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b, 
+							      size_t const& nevents){
+  std::unique_lock<std::mutex> lock(b.buffer_mutex);
+  while(!lock.try_lock()){}
+  b.buffer.insert(b.buffer.end(),&(FEBDTPBufferUPtr[0]),&(FEBDTPBufferUPtr[nevents]));
+  return b.buffer.size();
+}
 
+size_t bernfebdaq::BernFEB_GeneratorBase::EraseFromFEBBuffer(FEBBuffer_t & b,
+							     FEBEventBuffer_t::iterator const& it_start,
+							     FEBEventBuffer_t::iterator const& it_end) {
+  std::unique_lock<std::mutex> lock(b.buffer_mutex);
+  while(!lock.try_lock()){}
+  b.buffer.erase(it_start,it_end);
+  return b.buffer.size();
 }
 
 bool bernfebdaq::BernFEB_GeneratorBase::GetData()
@@ -144,19 +144,20 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 
   if( GetDataSetup()!=1 ) return false;;
 
-  size_t this_n_events=0,n_events=0;
+  size_t this_n_events=0,n_events=0,new_buffer_size=0;
   for(auto const& id : FEBIDs_){
     this_n_events = GetFEBData(id)/sizeof(BernFEBEvent);
-    FEBDequeBuffers_[id].buffer.insert(FEBDequeBuffers_[id].buffer.end(),&(FEBDTPBufferUPtr[0]),&(FEBDTPBufferUPtr[this_n_events]));
+    auto & feb = FEBBuffers_[id];
+    new_buffer_size = InsertIntoFEBBuffer(feb,this_n_events);
     n_events += this_n_events;
 
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, n_events=%lu",id,this_n_events);
-    TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, buffer_size=%lu",id,FEBDequeBuffers_[id].buffer.size());
+    TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, buffer_size=%lu",id,feb.buffer.size());
 
     auto id_str = GetFEBIDString(id);
 
     metricMan_->sendMetric("EventsAdded_"+id_str,this_n_events,"events",5,true);
-    SendBufferOccupancyMetrics(id);
+    UpdateBufferOccupancyMetrics(id,new_buffer_size);
   }
   
   TRACE(TR_GD_LOG,"BernFeb::GetData() completed, n_events=%lu",n_events);
@@ -175,7 +176,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 {
   TRACE(TR_FF_LOG,"BernFeb::FillFragment(id=0x%lx,frags,clear=%d) called",feb_id,clear_buffer);
 
-  auto & feb = FEBDequeBuffers_[feb_id];
+  auto & feb = FEBBuffers_[feb_id];
 
   if(!clear_buffer && feb.buffer.size()==0) {
     TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer empty.");
@@ -191,11 +192,11 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   int32_t local_last_time = feb.last_time_counter;
   bool found_fragment=false;
 
-  auto it_start_fragment = feb.buffer.cbegin();
-  auto it_end_fragment=feb.buffer.cend();
+  auto it_start_fragment = feb.buffer.begin();
+  auto it_end_fragment=feb.buffer.end() - 1;
 
   //just find the time boundary first
-  for(auto it=it_start_fragment; it!=it_end_fragment;++it){
+  for(auto it=it_start_fragment; it!=it_end_fragment+1;++it){
 
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",it->c_str());
 
@@ -279,13 +280,13 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	std::distance(it_start_fragment,it_end_fragment),metadata.c_str());
 
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size before erase = %lu",feb.buffer.size());
-  feb.buffer.erase(it_start_fragment,it_end_fragment);
+  size_t new_buffer_size = EraseFromFEBBuffer(feb,it_start_fragment,it_end_fragment);
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size after erase = %lu",feb.buffer.size());
   //std::cout << "New first fragment has time " << feb.buffer.cbegin()->time1 << std::endl;
 
   auto id_str = GetFEBIDString(feb_id);
   metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,false,true);
-  SendBufferOccupancyMetrics(feb_id);
+  UpdateBufferOccupancyMetrics(feb_id,new_buffer_size);
   SendMetadataMetrics(metadata);
 
   return true;

@@ -4,13 +4,14 @@
 
 #include "bernfebdaq-core/Overlays/BernFEBFragment.hh"
 #include "bernfebdaq-core/Overlays/FragmentType.hh"
-//#include "CAENComm.h"
-//#include "A2795.h"
+
 #include <unistd.h>
 #include <vector>
 #include <deque>
 #include <unordered_map>
 #include <atomic>
+#include <mutex>
+#include <boost/circular_buffer.hpp>
 
 #include "workerThread.h"
 
@@ -71,29 +72,49 @@ namespace bernfebdaq {
     uint32_t FEBDTPBufferCapacity_;
     uint32_t FEBDTPBufferSizeBytes_;
 
+    typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
+
   private:
     typedef struct FEBBuffer{
-      std::deque<BernFEBEvent> buffer;
-      size_t   time_resets;
-      int64_t  next_time_start;
-      uint32_t overwritten_counter;
-      int32_t  last_time_counter;
-      FEBBuffer():buffer(std::deque<BernFEBEvent>()),
-		  time_resets(0),
-		  next_time_start(0),
-		  overwritten_counter(0),
-		  last_time_counter(-1){}
+      FEBEventBuffer_t buffer;
+      std::mutex       buffer_mutex;
+      size_t           time_resets;
+      int64_t          next_time_start;
+      uint32_t         overwritten_counter;
+      int32_t          last_time_counter;
+      FEBBuffer(uint32_t capacity)
+	: buffer(FEBEventBuffer_t(capacity)),
+	  time_resets(0),
+	  next_time_start(0),
+	  overwritten_counter(0),
+	  last_time_counter(-1)
+      { buffer.clear(); }
+      FEBBuffer() { FEBBuffer(0); }
+      FEBBuffer& operator=(const FEBBuffer& b){
+	  buffer = b.buffer;
+	  time_resets = b.time_resets;
+	  next_time_start = b.next_time_start;
+	  overwritten_counter = b.overwritten_counter;
+	  last_time_counter = b.last_time_counter;
+	  return *this;
+      }
     } FEBBuffer_t;
 
-    std::unordered_map< uint64_t, FEBBuffer_t > FEBDequeBuffers_;
-    uint32_t FEBDequeBufferCapacity_;
-    uint32_t FEBDequeBufferSizeBytes_;
+    std::unordered_map< uint64_t, FEBBuffer_t > FEBBuffers_;
+    uint32_t FEBBufferCapacity_;
+    uint32_t FEBBufferSizeBytes_;
 
     bool GetData();
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
-    std::string GetFEBIDString(uint64_t id) const;
+
+    size_t InsertIntoFEBBuffer(FEBBuffer_t &,size_t const&);
+    size_t EraseFromFEBBuffer(FEBBuffer_t &,
+			      FEBEventBuffer_t::iterator const&,
+			      FEBEventBuffer_t::iterator const&);
+
+    std::string GetFEBIDString(uint64_t const& id) const;
     void SendMetadataMetrics(BernFEBFragmentMetadata const& m);
-    void SendBufferOccupancyMetrics(uint64_t id) const;
+    void UpdateBufferOccupancyMetrics(uint64_t const& ,size_t const&) const;
     
     WorkerThreadUPtr GetData_thread_;
 
