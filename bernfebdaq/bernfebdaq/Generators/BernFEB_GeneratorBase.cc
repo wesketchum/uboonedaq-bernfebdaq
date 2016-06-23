@@ -196,11 +196,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 				   
   int64_t time = 0;
   size_t  local_time_resets = 0;
-  bool local_last_reference1 = false;
-  int32_t local_last_time = feb.last_time_counter;
 
-  int32_t local_last_time1 = feb.last_time_counter;
-  
+  int32_t local_last_time = feb.last_time_counter;
 
   bool found_fragment=false;
 
@@ -211,29 +208,36 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
 
   //just find the time boundary first
-  for(size_t i_e=0; i_e<buffer_end; ++i_e){
+  for(size_t i_e=0; i_e<buffer_end-1; ++i_e){
   
     auto const& this_event = feb.buffer[i_e];
+    auto const& next_event = feb.buffer[i_e+1];
 
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
 
 
+    //if we have a reset
     if((int64_t)this_event.time1.Time() <= local_last_time && 
-       (int64_t)this_event.time1.Time() <= local_last_time1 &&
-       !local_last_reference1)
+       (int64_t)next_event.time1.Time() <= local_last_time && 
+       !this_event.time1.IsReference() && 
+       (int64_t)next_event.time1.Time() > (int64_t)this_event.time1.Time())
       {
-	TRACE(TR_ERROR,"BernFeb::FillFragment() ERROR! Time stamp error. Not updating last time, and doing a workaround.");
-	local_last_reference1 = this_event.time1.IsReference();
-	continue;
+	++local_time_resets;
       }
+    //this_event is has bad time, but next_event looks ok
+    else if((int64_t)this_event.time1.Time() <= local_last_time &&
+	    (int64_t)next_event.time1.Time() <= (int64_t)this_event.time1.Time() &&
+	    (int64_t)next_event.time1.Time() > local_last_time){
+
+      TRACE(TR_ERROR,"BernFeb::FillFragment() ERROR! Time stamp error. Not updating last time, and doing a workaround.");
+      continue;
+    }
+    /*
     else if((int64_t)this_event.time1.Time() <= local_last_time && local_last_reference1)
       ++local_time_resets;
-
-    local_last_time1 = local_last_time;
+    */
     local_last_time = this_event.time1.Time();
     
-    local_last_reference1 = this_event.time1.IsReference();
-
     time = this_event.time1.Time()+(feb.time_resets+local_time_resets)*1e9;
 
     TRACE(TR_FF_DEBUG,
