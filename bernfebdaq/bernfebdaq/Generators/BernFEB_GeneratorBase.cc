@@ -185,8 +185,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
   auto & feb = (FEBBuffers_[feb_id]);
 
-  if(!clear_buffer && feb.buffer.size()==0) {
-    TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer empty.");
+  if(!clear_buffer && feb.buffer.size()<3) {
+    TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer (mostly) empty.");
     return false;
   }
 
@@ -196,7 +196,12 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 				   
   int64_t time = 0;
   size_t  local_time_resets = 0;
+  bool local_last_reference1 = false;
   int32_t local_last_time = feb.last_time_counter;
+
+  int32_t local_last_time1 = feb.last_time_counter;
+  
+
   bool found_fragment=false;
 
   size_t buffer_end = feb.buffer.size();
@@ -212,9 +217,22 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
 
-    if((int64_t)this_event.time1.Time() <= local_last_time)
+
+    if((int64_t)this_event.time1.Time() <= local_last_time && 
+       (int64_t)this_event.time1.Time() <= local_last_time1 &&
+       !local_last_reference1)
+      {
+	TRACE(TR_ERROR,"BernFeb::FillFragment() ERROR! Time stamp error. Not updating last time, and doing a workaround.");
+	local_last_reference1 = this_event.time1.IsReference();
+	continue;
+      }
+    else if((int64_t)this_event.time1.Time() <= local_last_time && local_last_reference1)
       ++local_time_resets;
+
+    local_last_time1 = local_last_time;
     local_last_time = this_event.time1.Time();
+    
+    local_last_reference1 = this_event.time1.IsReference();
 
     time = this_event.time1.Time()+(feb.time_resets+local_time_resets)*1e9;
 
