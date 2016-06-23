@@ -298,8 +298,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 void bernfebdaq::BernFEB_GeneratorBase::SendMetadataMetrics(BernFEBFragmentMetadata const& m) {
   auto id_str = GetFEBIDString(m.feb_id());
   metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end()),"ns",5,true,false);
-  //metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true);
-  //metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5);
+  metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true);
+  metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5);
   metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5);
   float eff=1.0;
   if((m.n_events()+m.missed_events()+m.overwritten_events())!=0)
