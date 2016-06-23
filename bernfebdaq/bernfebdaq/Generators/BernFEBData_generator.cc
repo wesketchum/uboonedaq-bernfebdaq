@@ -25,10 +25,8 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
   
   runBiasOn = ps_.get<bool>("BiasON",true);
 
-  sleep(2);
   febdrv.sendstats();
   febdrv.sendstats2();
-  sleep(2);
 
   febconf.SetSCRConf(ps_.get<std::string>("SCRCONF"));
   febconf.SetPMRConf(ps_.get<std::string>("PMRCONF"));
@@ -43,28 +41,19 @@ bernfebdaq::BernFEBData::BernFEBData(fhicl::ParameterSet const & ps)
   PingFEBs();
   febdrv.SetDriverState(DRV_OK);
 
-  sleep(1);
   febdrv.sendstats();
   febdrv.sendstats2();
 
   for(auto const& febid : FEBIDs_){
     febdrv.configu((febid & 0xff),febconf.GetConfBuffer(),(1144+224)/8);
-    sleep(1);
+    usleep(1e5);
   }
 
-  for(int i=0; i<10; ++i){
-    sleep(1);
-    febdrv.sendstats();
-    febdrv.sendstats2();
-  }
   if(runBiasOn) febdrv.biasON(0xFF);
   else febdrv.biasOFF(0xFF);
 
-  for(int i=0; i<10; ++i){
-    sleep(1);
-    febdrv.sendstats();
-    febdrv.sendstats2();
-  }
+  febdrv.sendstats();
+  febdrv.sendstats2();
 
   TRACE(TR_LOG,"BernFEBData constructor completed");  
 }

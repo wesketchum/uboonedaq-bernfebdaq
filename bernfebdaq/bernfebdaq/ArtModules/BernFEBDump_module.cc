@@ -36,13 +36,15 @@ public:
 private:
   std::string raw_data_label_;
   int         verbosity_;
+  bool        TestPulseMode_;
 };
 
 
 bernfebdaq::BernFEBDump::BernFEBDump(fhicl::ParameterSet const & pset)
   : EDAnalyzer(pset),
     raw_data_label_(pset.get<std::string>("raw_data_label")),
-    verbosity_(pset.get<int>("verbosity",2))
+    verbosity_(pset.get<int>("verbosity",2)),
+    TestPulseMode_(pset.get<bool>("TestPulseMode",false))
 {
 }
 
@@ -78,12 +80,23 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
     std::cout << "Run " << evt.run() << ", subrun " << evt.subRun()
 	      << ", event " << eventNumber << " has " << raw->size()
 	      << " BernFEB fragment(s)." << std::endl;
-  }  
+  } 
+
+  size_t n_events=0;
+  bool event_mismatch_error = false;
   for (size_t idx = 0; idx < raw->size(); ++idx) {
     const auto& frag((*raw)[idx]);
     
     BernFEBFragment bb(frag);
     auto bbm = bb.metadata();
+
+    if(TestPulseMode_){
+      if(idx==0)
+	n_events=bbm->n_events();
+      else
+	if(bbm->n_events()!=n_events)
+	  event_mismatch_error = true;
+    }
 
     if(verbosity_==1)
       std::cout << "\tFragment ID=0x" << std::hex << bbm->feb_id() << std::dec
@@ -96,6 +109,17 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
     else if(verbosity_>2)
       std::cout << bb << std::endl;
   }
+
+
+  if(TestPulseMode_ && event_mismatch_error){
+    for (size_t idx = 0; idx < raw->size(); ++idx) {
+      const auto& frag((*raw)[idx]);
+      
+      BernFEBFragment bb(frag);
+      std::cout << bb << std::endl;
+    }
+  }
+
 }
 
 DEFINE_ART_MODULE(bernfebdaq::BernFEBDump)
