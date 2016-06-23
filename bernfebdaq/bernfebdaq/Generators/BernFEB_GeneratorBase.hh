@@ -12,6 +12,7 @@
 #include <atomic>
 #include <mutex>
 #include <boost/circular_buffer.hpp>
+#include <time.h>
 
 #include "workerThread.h"
 
@@ -73,12 +74,14 @@ namespace bernfebdaq {
     uint32_t FEBDTPBufferSizeBytes_;
 
     typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
+    typedef boost::circular_buffer<time_t>       FEBEventTimeBuffer_t;
     //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
   private:
     typedef struct FEBBuffer{
 
       FEBEventBuffer_t             buffer;
+      FEBEventTimeBuffer_t         timebuffer;
       std::unique_ptr<std::mutex>  mutexptr;
       size_t                       time_resets;
       int64_t                      next_time_start;
@@ -88,6 +91,7 @@ namespace bernfebdaq {
 
       FEBBuffer(uint32_t capacity, uint64_t i)
 	: buffer(FEBEventBuffer_t(capacity)),
+	  timebuffer(FEBEventTimeBuffer_t(capacity)),
 	  mutexptr(new std::mutex),
 	  time_resets(0),
 	  next_time_start(0),
@@ -98,6 +102,7 @@ namespace bernfebdaq {
       FEBBuffer() { FEBBuffer(0,0); }
       void Init() {
 	buffer.clear();
+	timebuffer.clear();
 	mutexptr->unlock();
 	time_resets = 0;
 	next_time_start = 0;
@@ -105,6 +110,8 @@ namespace bernfebdaq {
 	last_time_counter = 0;
       }
     } FEBBuffer_t;
+
+    timer_t insertTimer_;
 
     std::unordered_map< uint64_t, FEBBuffer_t  > FEBBuffers_;
     uint32_t FEBBufferCapacity_;
@@ -114,9 +121,7 @@ namespace bernfebdaq {
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
 
     size_t InsertIntoFEBBuffer(FEBBuffer_t &,size_t const&);
-    size_t EraseFromFEBBuffer(FEBBuffer_t &,
-			      FEBEventBuffer_t::iterator const&,
-			      FEBEventBuffer_t::iterator const&);
+    size_t EraseFromFEBBuffer(FEBBuffer_t &, size_t const&);
 
     std::string GetFEBIDString(uint64_t const& id) const;
     void SendMetadataMetrics(BernFEBFragmentMetadata const& m);
