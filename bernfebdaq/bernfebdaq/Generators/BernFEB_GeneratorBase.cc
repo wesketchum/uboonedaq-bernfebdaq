@@ -202,6 +202,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   bool found_fragment=false;
 
   size_t buffer_end = feb.buffer.size();
+  int n_TimeErrors_detectred = 0;
   
   TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment Searching. Total events in buffer=%lu.",
 	buffer_end);
@@ -224,8 +225,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	!(prev_event.time1.IsReference()||prev_event.time1.IsOverflow()) &&
 	!(next_event.time1.IsReference()||next_event.time1.IsOverflow()) &&
 	!(prev_event_time<this_event_time && this_event_time<next_event_time) ){
-      auto id_str = GetFEBIDString(feb_id);
-      metricMan_->sendMetric("TimeErrorDetected_"+id_str,1.0,"events",5,true,true);
+      n_TimeErrors_detected++;
       continue;
     }	
     if((int64_t)this_event.time1.Time() <= local_last_time)
@@ -316,6 +316,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
   auto id_str = GetFEBIDString(feb_id);
   metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,true,true);
+  metricMan_->sendMetric("TimeErrorDetected_"+id_str,n_TimeErrors_detected,"events",5,true,true);
   UpdateBufferOccupancyMetrics(feb_id,new_buffer_size);
   SendMetadataMetrics(metadata);
 
