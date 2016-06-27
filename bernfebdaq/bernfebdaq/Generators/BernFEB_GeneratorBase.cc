@@ -208,34 +208,27 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
 
   //just find the time boundary first
-  for(size_t i_e=0; i_e<buffer_end-1; ++i_e){
-  
+  for(size_t i_e=1; i_e<buffer_end-1; ++i_e){
+    
+    auto const& prev_event = feb.buffer[i_e];
     auto const& this_event = feb.buffer[i_e];
-    auto const& next_event = feb.buffer[i_e+1];
-
+    auto const& next_event = feb.buffer[i_e];
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
-
-
-    //if we have a reset
-    if((int64_t)this_event.time1.Time() <= local_last_time && 
-       (int64_t)next_event.time1.Time() <= local_last_time && 
-       !this_event.time1.IsReference() && 
-       (int64_t)next_event.time1.Time() > (int64_t)this_event.time1.Time())
-      {
-	++local_time_resets;
-      }
-    //this_event is has bad time, but next_event looks ok
-    else if((int64_t)this_event.time1.Time() <= local_last_time &&
-	    (int64_t)next_event.time1.Time() <= (int64_t)this_event.time1.Time() &&
-	    (int64_t)next_event.time1.Time() > local_last_time){
-
-      TRACE(TR_ERROR,"BernFeb::FillFragment() ERROR! Time stamp error. Not updating last time, and doing a workaround.");
+    
+    int64_t prev_event_time = prev_event.time1.Time();
+    int64_t this_event_time = this_event.time1.Time();
+    int64_t next_event_time = next_event.time1.Time();
+  
+  
+    if( !(this_event.time1.IsReference()||this_event.time1.IsOverflow()) &&
+	!(prev_event.time1.IsReference()||prev_event.time1.IsOverflow()) &&
+	!(next_event.time1.IsReference()||next_event.time1.IsOverflow()) &&
+	!(prev_event_time<this_event_time && this_event_time<next_event_time) )
       continue;
-    }
-    /*
-    else if((int64_t)this_event.time1.Time() <= local_last_time && local_last_reference1)
+	
+    if((int64_t)this_event.time1.Time() <= local_last_time)
       ++local_time_resets;
-    */
+    
     local_last_time = this_event.time1.Time();
     
     time = this_event.time1.Time()+(feb.time_resets+local_time_resets)*1e9;
