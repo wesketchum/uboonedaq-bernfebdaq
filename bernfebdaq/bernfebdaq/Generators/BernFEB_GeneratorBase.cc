@@ -224,6 +224,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	!(prev_event.time1.IsReference()||prev_event.time1.IsOverflow()) &&
 	!(next_event.time1.IsReference()||next_event.time1.IsOverflow()) &&
 	!(prev_event_time<this_event_time && this_event_time<next_event_time) ){
+      auto id_str = GetFEBIDString(feb_id);
       metricMan_->sendMetric("TimeErrorDetected_"+id_str,1.0,"events",5,true,true);
       continue;
     }	
