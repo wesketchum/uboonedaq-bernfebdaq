@@ -202,7 +202,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   bool found_fragment=false;
 
   size_t buffer_end = feb.buffer.size();
-  int n_TimeErrors_detectred = 0;
+  int n_TimeErrors_detected = 0;
   
   TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment Searching. Total events in buffer=%lu.",
 	buffer_end);
