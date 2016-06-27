@@ -223,9 +223,10 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
     if( !(this_event.time1.IsReference()||this_event.time1.IsOverflow()) &&
 	!(prev_event.time1.IsReference()||prev_event.time1.IsOverflow()) &&
 	!(next_event.time1.IsReference()||next_event.time1.IsOverflow()) &&
-	!(prev_event_time<this_event_time && this_event_time<next_event_time) )
+	!(prev_event_time<this_event_time && this_event_time<next_event_time) ){
+      metricMan_->sendMetric("TimeErrorDetected_"+id_str,1.0,"events",5,true,true);
       continue;
-	
+    }	
     if((int64_t)this_event.time1.Time() <= local_last_time)
       ++local_time_resets;
     
@@ -313,7 +314,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size after erase = %lu",feb.buffer.size());
 
   auto id_str = GetFEBIDString(feb_id);
-  metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,false,true);
+  metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,true,true);
   UpdateBufferOccupancyMetrics(feb_id,new_buffer_size);
   SendMetadataMetrics(metadata);
 
