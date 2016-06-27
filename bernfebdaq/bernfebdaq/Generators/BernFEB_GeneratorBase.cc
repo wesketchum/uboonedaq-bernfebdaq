@@ -211,9 +211,9 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   //just find the time boundary first
   for(size_t i_e=1; i_e<buffer_end-1; ++i_e){
     
-    auto const& prev_event = feb.buffer[i_e];
+    auto const& prev_event = feb.buffer[i_e-1];
     auto const& this_event = feb.buffer[i_e];
-    auto const& next_event = feb.buffer[i_e];
+    auto const& next_event = feb.buffer[i_e+1];
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
     
     int64_t prev_event_time = prev_event.time1.Time();
