@@ -28,8 +28,19 @@ bernfebdaq::BernFEB_GeneratorBase::BernFEB_GeneratorBase(fhicl::ParameterSet con
   TRACE(TR_LOG,"BernFeb constructor completed");  
 }
 
-void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
+uint32_t BinaryToGrayTemp(uint32_t bin_time){
+  
+  uint32_t gray_time(bin_time&0x7); 
+  for(size_t i_b=3; i_b<32; ++i_b){
+    gray_time += (((bin_time & (1<<i_b))>>i_b)^((bin_time & (1<<(i_b-1)))>>(i_b-1))) << i_b;
+  }
+  
+  return gray_time;
+  
+}
 
+void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
+  
   TRACE(TR_LOG,"BernFeb::Initialze() called");
 
   RunNumber_ = ps_.get<uint32_t>("RunNumber",999);
@@ -131,8 +142,79 @@ size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
   //don't fill while we wait for available capacity...
   while( (b.buffer.capacity()-b.buffer.size()) < nevents){ usleep(10); }
 
+  //obtain the lock
   std::unique_lock<std::mutex> lock(*(b.mutexptr));
+
+  //ok, now, we need to do a few things:
+  //(1) insert at the end of the circular buffer
+  //(2) detect if we have a wraparound in time ... this may fail if we don't pull often
+  //(3) sort new events based on time stamp, using wraparound condition if necessary.
+  //(4) merge in place, assuming previous elements have been sorted already...
+
+  size_t prev_size = b.buffer.size();
+  auto time_start = b.buffer.front().time1.Time();
+  auto time_last = b.buffer.back().time1.Time();
+
+  TRACE(TR_DEBUG,"FEB ID 0x%lx. Current buffer size %lu with times [%u,%u].",b.id,prev_size,time_start,time_last);
+  TRACE(TR_DEBUG,"Want to add %lu events with times [%u,%u].",nevents,
+	FEBDTPBufferUPtr[0].time1.Time(),
+	FEBDTPBufferUPtr[nevents-1].time1.Time());
+	
+
   b.buffer.insert(b.buffer.end(),&(FEBDTPBufferUPtr[0]),&(FEBDTPBufferUPtr[nevents]));
+  
+  TRACE(TR_DEBUG,"After insert, now have %lu in buffer.",b.buffer.size());
+  
+  TRACE(TR_DEBUG,"Before sort, here's contents of buffer:");
+  TRACE(TR_DEBUG,"============================================");
+  for(size_t i_e=0; i_e<b.buffer.size(); ++i_e){
+    if(i_e==prev_size)
+      TRACE(TR_DEBUG,"--------------------------------------------");
+    TRACE(TR_DEBUG,"\t\t %lu : %u %x (%x)",i_e,b.buffer.at(i_e).time1.Time(),b.buffer.at(i_e).time1.rawts,BinaryToGrayTemp(b.buffer.at(i_e).time1.Time()));
+  } 
+  TRACE(TR_DEBUG,"============================================");
+  
+  
+  int a_offset=0,b_offset=0;
+
+  if( !std::is_sorted(b.buffer.begin()+prev_size,b.buffer.end(),
+		      [&time_start,&time_last,&a_offset,&b_offset](BernFEBEvent const& e_a,BernFEBEvent const& e_b)
+		      {
+			if(e_a.time1.Time()<time_start||e_a.time1.Time()<time_last) a_offset=1e9; else a_offset=0;
+			if(e_b.time1.Time()<time_start||e_b.time1.Time()<time_last) b_offset=1e9; else b_offset=0;
+			return (e_b.time1.Time()+b_offset)>(e_a.time1.Time()+a_offset);
+		      }) )
+    TRACE(TR_DEBUG,"IT'S NOT SORTED!!!!!!!");
+  
+  std::sort(b.buffer.begin()+prev_size,b.buffer.end(),[&time_start,&time_last,&a_offset,&b_offset](BernFEBEvent const& e_a,BernFEBEvent const& e_b){
+      if(e_a.time1.Time()<time_start||e_a.time1.Time()<time_last) a_offset=1e9; else a_offset=0;
+      if(e_b.time1.Time()<time_start||e_b.time1.Time()<time_last) b_offset=1e9; else b_offset=0;
+      return (e_b.time1.Time()+b_offset)>(e_a.time1.Time()+a_offset);
+    });
+
+  TRACE(TR_DEBUG,"After sort, here's contents of buffer:");
+  TRACE(TR_DEBUG,"============================================");
+  for(size_t i_e=0; i_e<b.buffer.size(); ++i_e){
+    if(i_e==prev_size)
+      TRACE(TR_DEBUG,"--------------------------------------------");
+    TRACE(TR_DEBUG,"\t\t %lu : %u %x",i_e,b.buffer.at(i_e).time1.Time(),b.buffer.at(i_e).time1.rawts);
+  } 
+  TRACE(TR_DEBUG,"============================================");
+  
+  /*
+  std::inplace_merge(b.buffer.begin(),b.buffer.begin()+prev_size,b.buffer.end(),
+		     [&time_start,&time_last,&a_offset,&b_offset](BernFEBEvent const& e_a,BernFEBEvent const& e_b){
+		       if(e_a.time1.Time()<time_start||e_a.time1.Time()<time_last) a_offset=1e9; else a_offset=0;
+		       if(e_b.time1.Time()<time_start||e_b.time1.Time()<time_last) b_offset=1e9; else b_offset=0;
+		       return (e_b.time1.Time()+b_offset)>(e_a.time1.Time()+a_offset);
+		     });
+  */
+  TRACE(TR_DEBUG,"After in place merge, here's contents of buffer:");
+  TRACE(TR_DEBUG,"============================================");
+  for(size_t i_e=0; i_e<b.buffer.size(); ++i_e)
+    TRACE(TR_DEBUG,"\t\t %lu : %u %x",i_e,b.buffer.at(i_e).time1.Time(),b.buffer.at(i_e).time1.rawts);
+  TRACE(TR_DEBUG,"============================================");
+  
   b.timebuffer.insert(b.timebuffer.end(),nevents,timenow);
   return b.buffer.size();
 }
@@ -211,23 +293,24 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   //just find the time boundary first
   for(size_t i_e=1; i_e<buffer_end-1; ++i_e){
     
-    auto const& prev_event = feb.buffer[i_e-1];
+    //auto const& prev_event = feb.buffer[i_e-1];
     auto const& this_event = feb.buffer[i_e];
-    auto const& next_event = feb.buffer[i_e+1];
+    //auto const& next_event = feb.buffer[i_e+1];
     TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
     
-    int64_t prev_event_time = prev_event.time1.Time();
-    int64_t this_event_time = this_event.time1.Time();
-    int64_t next_event_time = next_event.time1.Time();
+    //int64_t prev_event_time = prev_event.time1.Time();
+    //int64_t this_event_time = this_event.time1.Time();
+    //int64_t next_event_time = next_event.time1.Time();
   
-  
+    /*
     if( !(this_event.time1.IsReference()||this_event.time1.IsOverflow()) &&
 	!(prev_event.time1.IsReference()||prev_event.time1.IsOverflow()) &&
 	!(next_event.time1.IsReference()||next_event.time1.IsOverflow()) &&
 	!(prev_event_time<this_event_time && this_event_time<next_event_time) ){
       n_TimeErrors_detected++;
       continue;
-    }	
+    }
+    */	
     if((int64_t)this_event.time1.Time() <= local_last_time)
       ++local_time_resets;
     
