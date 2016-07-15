@@ -11,5 +11,12 @@
 simple_plugin(BernFEBDump "module"
               bernfebdaq-core_Overlays)
 
+simple_plugin(TimeCoincidence "module"
+              bernfebdaq-core_Overlays
+	      art_Framework_Services_Optional
+	      art_Framework_Services_Registry
+	      art_Framework_Services_Optional_TFileService_service
+	      ${ROOT_BASIC_LIB_LIST} )
+
 # Subdirectories.
 #add_subdirectory(DQM)
