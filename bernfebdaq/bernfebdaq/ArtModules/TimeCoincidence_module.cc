@@ -54,7 +54,7 @@ bernfebdaq::TimeCoincidence::TimeCoincidence(fhicl::ParameterSet const & pset)
   //this is the magic stuff that sets up the tree.
   art::ServiceHandle<art::TFileService> tfs;
   my_tree_ = tfs->make<TTree>("my_tree","CRT Analysis Tree");
-  
+
 }
 
 //destructor. Ain't doing much.
