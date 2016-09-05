@@ -139,7 +139,7 @@ void bernfebdaq::BernFEB_GeneratorBase::UpdateBufferOccupancyMetrics(uint64_t co
 size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b, 
 							      size_t const& nevents){
   
-  timeval timenow; gettimeofday(&timenow);
+  timeval timenow; gettimeofday(&timenow,NULL);
 
   //don't fill while we wait for available capacity...
   while( (b.buffer.capacity()-b.buffer.size()) < nevents){ usleep(10); }
@@ -162,11 +162,39 @@ size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
 	FEBDTPBufferUPtr[0].time1.Time(),
 	FEBDTPBufferUPtr[nevents-1].time1.Time());
 	
-
+  //note: add timebuffer values in first, to avoid read-only race conditions later on
+  b.timebuffer.insert(b.timebuffer.end(),nevents,timenow);
   b.buffer.insert(b.buffer.end(),&(FEBDTPBufferUPtr[0]),&(FEBDTPBufferUPtr[nevents]));
   
   TRACE(TR_DEBUG,"After insert, now have %lu in buffer.",b.buffer.size());
-  
+
+  auto last_sorted_iter = b.buffer.begin();
+  while(last_sorted_iter != b.buffer.end()){
+
+    //let's look and see where we have sorted/good times until
+    last_sorted_iter = std::is_sorted_until(b.buffer.begin()+prev_size,b.buffer.end(),
+					    [](BernFEBEvent const& e_a,BernFEBEvent const& e_b)
+					    { 
+					      return (e_b.time1.Time() > e_a.time1.Time()); 
+					    } );
+    
+    //if not all perfectly sorted
+    if(last_sorted_iter!=b.buffer.end()){
+      
+      //check if the prev value was a reference or if we are at an overflow area
+      if(std::prev(last_sorted_iter)->time1.IsReference() || last_sorted_iter->time1.IsOverflow()){
+	prev_size += std::distance(b.buffer.begin()+prev_size,last_sorted_iter);
+	time_last = std::prev(last_sorted_iter)->time1.Time();
+      }
+      //if not, we're gonna want to drop these events for good
+      else{
+	size_t my_events = std::distance(b.buffer.begin()+prev_size,last_sorted_iter);
+	b.buffer.erase_end(nevents-my_events);
+	b.timebuffer.erase_end(nevents-my_events);
+      }
+    }
+  }
+  /*
   TRACE(TR_DEBUG,"Before sort, here's contents of buffer:");
   TRACE(TR_DEBUG,"============================================");
   for(size_t i_e=0; i_e<b.buffer.size(); ++i_e){
@@ -202,7 +230,7 @@ size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
     TRACE(TR_DEBUG,"\t\t %lu : %u %x",i_e,b.buffer.at(i_e).time1.Time(),b.buffer.at(i_e).time1.rawts);
   } 
   TRACE(TR_DEBUG,"============================================");
-  
+  */  
   /*
   std::inplace_merge(b.buffer.begin(),b.buffer.begin()+prev_size,b.buffer.end(),
 		     [&time_start,&time_last,&a_offset,&b_offset](BernFEBEvent const& e_a,BernFEBEvent const& e_b){
@@ -217,7 +245,6 @@ size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
     TRACE(TR_DEBUG,"\t\t %lu : %u %x",i_e,b.buffer.at(i_e).time1.Time(),b.buffer.at(i_e).time1.rawts);
   TRACE(TR_DEBUG,"============================================");
   
-  b.timebuffer.insert(b.timebuffer.end(),nevents,timenow);
   return b.buffer.size();
 }
 
@@ -354,13 +381,13 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   //ok, queue was non-empty, and we saw our last event. Need to loop through and do proper accounting now.
 
   //make metadata object
-  BernFEBFragmentMetadata metadata((feb.next_time_start/1e9),
-				   feb.next_time_start%1e9,
-				   std::gmtime(starttime.tv_sec),
+  BernFEBFragmentMetadata metadata((feb.next_time_start/1000000000),
+				   feb.next_time_start % 1000000000,
+				   (uint32_t)(starttime.tv_sec),
 				   1e3*starttime.tv_usec,
-				   (feb.next_time_start+SequenceTimeWindowSize_)/1e9,
-				   (feb.next_time_start+SequenceTimeWindowSize_)%1e9,				   
-				   std::gmtime(endtime.tv_sec),
+				   (feb.next_time_start+SequenceTimeWindowSize_)/1000000000,
+				   (feb.next_time_start+SequenceTimeWindowSize_) % 1000000000,				   
+				   (uint32_t)(endtime.tv_sec),
 				   1e3*endtime.tv_usec,
 				   RunNumber_,
 				   feb.next_time_start/SubrunTimeWindowSize_,
@@ -421,7 +448,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
 void bernfebdaq::BernFEB_GeneratorBase::SendMetadataMetrics(BernFEBFragmentMetadata const& m) {
   std::string id_str = GetFEBIDString(m.feb_id());
-  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end()),"ns",5,true,false);
+  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end_seconds_raw()+m.time_end_nanosec_raw()),"ns",5,true,false);
   metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true);
   metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5);
   metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5);
