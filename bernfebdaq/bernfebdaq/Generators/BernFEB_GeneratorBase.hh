@@ -12,7 +12,7 @@
 #include <atomic>
 #include <mutex>
 #include <boost/circular_buffer.hpp>
-#include <time.h>
+#include <sys/time.h>
 
 #include "workerThread.h"
 
@@ -74,7 +74,7 @@ namespace bernfebdaq {
     uint32_t FEBDTPBufferSizeBytes_;
 
     typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
-    typedef boost::circular_buffer<time_t>       FEBEventTimeBuffer_t;
+    typedef boost::circular_buffer<timeval>      FEBEventTimeBuffer_t;
     //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
   private:
@@ -111,7 +111,7 @@ namespace bernfebdaq {
       }
     } FEBBuffer_t;
 
-    timer_t insertTimer_;
+    std::chrono::system_clock insertTimer_;
 
     std::unordered_map< uint64_t, FEBBuffer_t  > FEBBuffers_;
     uint32_t FEBBufferCapacity_;

@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string>
 #include <time.h>
+#include <sys/time.h>
 
 bernfebdaq::BernFEB_GeneratorBase::BernFEB_GeneratorBase(fhicl::ParameterSet const & ps)
   :
@@ -137,7 +138,8 @@ void bernfebdaq::BernFEB_GeneratorBase::UpdateBufferOccupancyMetrics(uint64_t co
 
 size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b, 
 							      size_t const& nevents){
-  auto timenow = time(NULL);
+  
+  timeval timenow; gettimeofday(&timenow);
 
   //don't fill while we wait for available capacity...
   while( (b.buffer.capacity()-b.buffer.size()) < nevents){ usleep(10); }
@@ -285,6 +287,9 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
   size_t buffer_end = feb.buffer.size();
   int n_TimeErrors_detected = 0;
+
+  timeval starttime = feb.timebuffer.at(0);
+  timeval endtime   = feb.timebuffer.at(buffer_end-1);
   
   TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment Searching. Total events in buffer=%lu.",
 	buffer_end);
@@ -330,6 +335,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	    time,feb.next_time_start+SequenceTimeWindowSize_);
       buffer_end = i_e;
       found_fragment = true;
+      starttime = feb.timebuffer[0];
+      endtime = feb.timebuffer[i_e];
       break;
     }
   }
@@ -347,8 +354,14 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   //ok, queue was non-empty, and we saw our last event. Need to loop through and do proper accounting now.
 
   //make metadata object
-  BernFEBFragmentMetadata metadata(feb.next_time_start,
-				   feb.next_time_start+SequenceTimeWindowSize_,
+  BernFEBFragmentMetadata metadata((feb.next_time_start/1e9),
+				   feb.next_time_start%1e9,
+				   std::gmtime(starttime.tv_sec),
+				   1e3*starttime.tv_usec,
+				   (feb.next_time_start+SequenceTimeWindowSize_)/1e9,
+				   (feb.next_time_start+SequenceTimeWindowSize_)%1e9,				   
+				   std::gmtime(endtime.tv_sec),
+				   1e3*endtime.tv_usec,
 				   RunNumber_,
 				   feb.next_time_start/SubrunTimeWindowSize_,
 				   feb.next_time_start/SequenceTimeWindowSize_ + 1,

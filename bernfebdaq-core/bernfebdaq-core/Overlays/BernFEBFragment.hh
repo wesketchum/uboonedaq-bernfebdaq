@@ -35,13 +35,22 @@ public:
 
   BernFEBFragmentMetadata(){}
 
-  BernFEBFragmentMetadata(int64_t ts, int64_t te,
+  BernFEBFragmentMetadata(uint32_t ts_s, uint32_t ts_ns, 
+			  uint32_t ts_s_ntp, uint32_t ts_ns_ntp,
+			  uint32_t te_s, uint32_t te_ns,
+			  uint32_t te_s_ntp, uint32_t te_ns_ntp,
 			  uint32_t r, uint32_t sr, uint32_t seq,
 			  uint64_t fid, uint32_t rid,
 			  uint32_t nch, uint32_t nadc)
     :
-    _time_start(ts),
-    _time_end(te),
+    _time_start_seconds_raw(ts_s),
+    _time_start_nanosec_raw(ts_ns),
+    _time_start_seconds_ntp(ts_s_ntp),
+    _time_start_nanosec_ntp(ts_ns_ntp),
+    _time_end_seconds_raw(te_s),
+    _time_end_nanosec_raw(te_ns),
+    _time_end_seconds_ntp(te_s_ntp),
+    _time_end_nanosec_ntp(te_ns_ntp),
     _run_number(r),
     _subrun_number(sr),
     _sequence_number(seq),
@@ -55,8 +64,16 @@ public:
     _n_datagrams(0)    
   { CheckTimeWindow(); }
 
-  int64_t  const& time_start()         const { return _time_start; }
-  int64_t  const& time_end()           const { return _time_end; }
+  uint32_t const& time_start_seconds_raw() const { return _time_start_seconds_raw; }
+  uint32_t const& time_start_nanosec_raw() const { return _time_start_nanosec_raw; }
+  uint32_t const& time_start_seconds_ntp() const { return _time_start_seconds_ntp; }
+  uint32_t const& time_start_nanosec_ntp() const { return _time_start_nanosec_ntp; }
+
+  uint32_t const& time_end_seconds_raw() const { return _time_end_seconds_raw; }
+  uint32_t const& time_end_nanosec_raw() const { return _time_end_nanosec_raw; }
+  uint32_t const& time_end_seconds_ntp() const { return _time_end_seconds_ntp; }
+  uint32_t const& time_end_nanosec_ntp() const { return _time_end_nanosec_ntp; }
+
   uint32_t const& run_number()         const { return _run_number; }
   uint32_t const& subrun_number()      const { return _subrun_number; }
   uint32_t const& sequence_number()    const { return _sequence_number; }
@@ -81,8 +98,15 @@ public:
 
 private:
 
-  int64_t _time_start; //nanoseconds since epoch? or start of run
-  int64_t _time_end;   //nanoseconds since epoch? or start of run
+  uint32_t _time_start_seconds_raw; //time since start of run, basically, according to FEBs
+  uint32_t _time_start_nanosec_raw; //time since start of run, basically, according to FEBs
+  uint32_t _time_start_seconds_ntp; //time since start of epoch, system time
+  uint32_t _time_start_nanosec_ntp; //time since start of epoch, system time
+
+  uint32_t _time_end_seconds_raw; //time since start of run, basically
+  uint32_t _time_end_nanosec_raw; //time since start of run, basically
+  uint32_t _time_end_seconds_ntp; //time since start of epoch
+  uint32_t _time_end_nanosec_ntp; //time since start of epoch
 
   uint32_t _run_number;
   uint32_t _subrun_number;

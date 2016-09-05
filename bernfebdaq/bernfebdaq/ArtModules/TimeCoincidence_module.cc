@@ -93,13 +93,13 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
     //See bernfebdaq-core/bernfebdaq-core/Overlays/BernFEBFragment.hh
     auto bfrag_metadata = bfrag.metadata();
 
-    int64_t  time_begin = bfrag_metadata->time_start(); //start time of this packet of data
-    int64_t  time_end   = bfrag_metadata->time_end();   //end time of this packet of data
-    uint64_t mac        = bfrag_metadata->feb_id();     //mac addresss of this packet
+    //int64_t  time_begin = bfrag_metadata->time_start(); //start time of this packet of data
+    //int64_t  time_end   = bfrag_metadata->time_end();   //end time of this packet of data
+    //uint64_t mac        = bfrag_metadata->feb_id();     //mac addresss of this packet
     size_t   nevents    = bfrag_metadata->n_events();   //number of BernFEBEvents in this packet
 
-    std::cout << "Analyzing " << nevents << " hits from FEB " << std::hex << (mac & 0xff) << std::dec
-	      << " from time range [" << time_begin << "," << time_end << ")" << std::endl;
+    //std::cout << "Analyzing " << nevents << " hits from FEB " << std::hex << (mac & 0xff) << std::dec
+    //	      << " from time range [" << time_begin << "," << time_end << ")" << std::endl;
 
     for(size_t i_e=0; i_e<nevents; ++i_e){
       BernFEBEvent const* this_event = bfrag.eventdata(i_e); //get the single hit/event

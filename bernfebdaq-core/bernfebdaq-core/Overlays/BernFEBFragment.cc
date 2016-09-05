@@ -4,16 +4,19 @@
 #include "cetlib/exception.h"
 
 void bernfebdaq::BernFEBFragmentMetadata::CheckTimeWindow() const {
-  if(_time_end < _time_start)
+  if(_time_end_seconds_raw*1e9+_time_end_nanosec_raw < _time_start_seconds_raw*1e9+_time_start_nanosec_raw)
     throw cet::exception("BernFragmentMetadata::CheckTimeWindow") 
-      << "Failed. time_start (" << _time_start << ") is after time_end (" << _time_end << ")";
+      << "Failed. time_start (" << _time_start_seconds_raw << "," << _time_start_nanosec_raw 
+      << ") is after time_end (" << _time_end_seconds_raw << "," << _time_end_nanosec_raw  << ")";
 }
 
 
 std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBFragmentMetadata const& m){
   os << "\nBernFEBFragmentMetadata:"
-     << "\n\tTime window start: " << m.time_start()
-     << "\n\tTime window end  : " << m.time_end()
+     << "\n\tTime window start (raw) : " << m.time_start_seconds_raw() << " s, " << m.time_start_nanosec_raw() << " ns" 
+     << "\n\tTime window end   (raw) : " << m.time_end_seconds_raw() << " s, " << m.time_end_nanosec_raw() << " ns" 
+     << "\n\tTime window start (ntp) : " << m.time_start_seconds_ntp() << " s, " << m.time_start_nanosec_ntp() << " ns" 
+     << "\n\tTime window end   (ntp) : " << m.time_end_seconds_ntp() << " s, " << m.time_end_nanosec_ntp() << " ns" 
      << "\n\tRun number: " << m.run_number()
      << "\n\tSubrun number: " << m.subrun_number()
      << "\n\tSequence number: " << m.sequence_number()
