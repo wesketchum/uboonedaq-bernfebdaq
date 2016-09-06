@@ -28,6 +28,7 @@ std::ostream & bernfebdaq::operator << (std::ostream & os, BernFEBFragmentMetada
      << "\n\tNumber of adc bits: " << m.n_adc_bits()
      << "\n\tNumber of missed events: " << m.missed_events()
      << "\n\tNumber of overwritten events: " << m.overwritten_events()
+     << "\n\tNumber of dropped events: " << m.dropped_events()
      << "\n\tNumber of events recorded: " << m.n_events()
      << "\n\tNumber of datagrams: " << m.n_datagrams();
   os << std::endl;

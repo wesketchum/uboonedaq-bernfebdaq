@@ -60,6 +60,7 @@ public:
     _n_adc_bits(nadc),
     _missed_events(0),
     _overwritten_events(0),
+    _dropped_events(0),
     _n_events(0),
     _n_datagrams(0)    
   { CheckTimeWindow(); }
@@ -83,16 +84,18 @@ public:
   uint32_t const& n_adc_bits()         const { return _n_adc_bits; }
   uint32_t const& missed_events()      const { return _missed_events; }
   uint32_t const& overwritten_events() const { return _overwritten_events; }
+  uint32_t const& dropped_events()     const { return _dropped_events; }
   uint32_t const& n_events()           const { return _n_events; }
   uint32_t const& n_datagrams()        const { return _n_datagrams; }
 
   uint32_t inc_MissedEvents(uint32_t n=1)      { _missed_events+=n; return missed_events(); }
   uint32_t inc_OverwrittenEvents(uint32_t n=1) { _overwritten_events+=n; return overwritten_events(); }
+  uint32_t inc_DroppedEvents(uint32_t n=1)     { _dropped_events+=n; return dropped_events(); }
   uint32_t inc_Events(uint32_t n=1)            { _n_events+=n; return n_events(); }
   uint32_t inc_Datagrams(uint32_t n=1)         { _n_datagrams+=n; return n_datagrams(); }
 
-  void increment(uint32_t missed, uint32_t overwritten, uint32_t events=1, uint32_t d=0)
-  { inc_MissedEvents(missed); inc_OverwrittenEvents(overwritten); inc_Events(events); inc_Datagrams(d); }
+  void increment(uint32_t missed, uint32_t overwritten, uint32_t dropped, uint32_t events=1, uint32_t d=0)
+  { inc_MissedEvents(missed); inc_OverwrittenEvents(overwritten); inc_DroppedEvents(dropped); inc_Events(events); inc_Datagrams(d); }
 
   const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
 
@@ -120,6 +123,7 @@ private:
 
   uint32_t _missed_events;
   uint32_t _overwritten_events;
+  uint32_t _dropped_events;
   uint32_t _n_events;
   uint32_t _n_datagrams;
 

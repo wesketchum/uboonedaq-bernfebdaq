@@ -75,6 +75,7 @@ namespace bernfebdaq {
 
     typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
     typedef boost::circular_buffer<timeval>      FEBEventTimeBuffer_t;
+    typedef boost::circular_buffer<unsigned int> FEBEventsDroppedBuffer_t;
     //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
   private:
@@ -82,6 +83,7 @@ namespace bernfebdaq {
 
       FEBEventBuffer_t             buffer;
       FEBEventTimeBuffer_t         timebuffer;
+      FEBEventsDroppedBuffer_t     droppedbuffer;
       std::unique_ptr<std::mutex>  mutexptr;
       size_t                       time_resets;
       int64_t                      next_time_start;
@@ -92,6 +94,7 @@ namespace bernfebdaq {
       FEBBuffer(uint32_t capacity, uint64_t i)
 	: buffer(FEBEventBuffer_t(capacity)),
 	  timebuffer(FEBEventTimeBuffer_t(capacity)),
+	  droppedbuffer(FEBEventsDroppedBuffer_t(capacity)),
 	  mutexptr(new std::mutex),
 	  time_resets(0),
 	  next_time_start(0),

@@ -92,7 +92,7 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
 
     if(TestPulseMode_){
       if(idx==0)
-	n_events=bbm->n_events();
+	n_events=bbm->n_events()+bbm->dropped_events();
       else
 	if(bbm->n_events()!=n_events)
 	  event_mismatch_error = true;
