@@ -41,6 +41,10 @@ namespace bernfebdaq {
     std::vector<uint64_t> FEBIDs_;
     size_t nFEBs() { return FEBIDs_.size(); }
 
+    std::vector<size_t>   TargetDTPSizes_;
+    std::vector<uint32_t> MaxTimeDiffs_;
+    unsigned int MaxDTPSleep_;           //nanoseconds
+
     std::size_t throttle_usecs_;        // Sleep at start of each call to getNext_(), in us
     std::size_t throttle_usecs_check_;  // Period between checks for stop/pause during the sleep (must be less than, and an integer divisor of, throttle_usecs_)
 
@@ -78,7 +82,44 @@ namespace bernfebdaq {
     typedef boost::circular_buffer<unsigned int> FEBEventsDroppedBuffer_t;
     //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
+    typedef std::chrono::high_resolution_clock hires_clock;
+
   private:
+
+    typedef struct DTPBufferTimer{
+
+      unsigned int                         target_dtp_size;
+
+      hires_clock                          buffer_clock;
+      std::chrono::time_point<hires_clock> time_start;
+      std::chrono::time_point<hires_clock> time_end;
+      unsigned int                         buffer_sleep;
+
+      DTPBufferTimer() { target_dtp_size=0; buffer_sleep=0; }
+
+      void set_target_size(unsigned int t) { target_dtp_size = t; }
+
+      void t_start()      { time_start = buffer_clock.now(); }
+      void t_end()        { time_end = buffer_clock.now(); }
+      int  nanosec()    { return std::chrono::nanoseconds(time_end-time_start).count(); }
+      bool check_time() { t_end(); if( (unsigned int)(nanosec()) < buffer_sleep) return false; else return true; }
+
+      int end_and_update(size_t nevents, unsigned int max_time)
+      {
+	t_end(); int ns = nanosec(); t_start();
+       
+	if(ns>0) { 
+	  if(nevents==0){ if(target_dtp_size==0) buffer_sleep=0; else buffer_sleep += 1e6; }
+	  else { buffer_sleep = ns * (float)(target_dtp_size)/(float)(nevents); }
+	}
+
+	if(buffer_sleep > max_time) buffer_sleep = max_time;
+
+	return ns;
+      }
+
+    } DTPBufferTimer_t;
+
     typedef struct FEBBuffer{
 
       FEBEventBuffer_t             buffer;
@@ -89,9 +130,11 @@ namespace bernfebdaq {
       int64_t                      next_time_start;
       uint32_t                     overwritten_counter;
       int32_t                      last_time_counter;
+      uint32_t                     max_time_diff;
+      DTPBufferTimer_t             timer;
       uint64_t                     id;
 
-      FEBBuffer(uint32_t capacity, uint64_t i)
+      FEBBuffer(uint32_t capacity, uint32_t td, uint32_t target_dtp_size, uint64_t i)
 	: buffer(FEBEventBuffer_t(capacity)),
 	  timebuffer(FEBEventTimeBuffer_t(capacity)),
 	  droppedbuffer(FEBEventsDroppedBuffer_t(capacity)),
@@ -100,9 +143,10 @@ namespace bernfebdaq {
 	  next_time_start(0),
 	  overwritten_counter(0),
 	  last_time_counter(-1),
+	  max_time_diff(td),
 	  id(i)
-      { Init(); }
-      FEBBuffer() { FEBBuffer(0,0); }
+      { Init(); timer.set_target_size(target_dtp_size); timer.t_start(); }
+      FEBBuffer() { FEBBuffer(0,10000000,0,0); }
       void Init() {
 	buffer.clear();
 	timebuffer.clear();

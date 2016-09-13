@@ -58,9 +58,41 @@ void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
   FEBDTPBufferCapacity_ = ps_.get<uint32_t>("FEBDTPBufferCapacity",1024);
   FEBDTPBufferSizeBytes_ = FEBDTPBufferCapacity_*sizeof(BernFEBEvent);
 
+  MaxTimeDiffs_   = ps_.get< std::vector<uint32_t> >("MaxTimeDiffs",std::vector<uint32_t>(FEBIDs_.size(),1e7));
+  MaxDTPSleep_    = ps_.get<uint32_t>("MaxDTPSleep",5e8);
+  TargetDTPSizes_ = ps_.get< std::vector<size_t> >("TargetDTPSizes",std::vector<size_t>(FEBIDs_.size(),FEBDTPBufferCapacity_/2));
+
+  if(TargetDTPSizes_.size()!=FEBIDs_.size()){
+    if(TargetDTPSizes_.size()==1){
+      auto size = TargetDTPSizes_.at(0);
+      TargetDTPSizes_ = std::vector<size_t>(FEBIDs_.size(),size);
+    }
+    else{
+      throw cet::exception("BernFEB_GeneratorBase::Iniitalize")
+	<< "TargetDTPSizes must be same size as FEBIDs in config!";
+    }
+  }
+
+  for(auto const& s : TargetDTPSizes_)
+    if(s > FEBDTPBufferCapacity_)
+      throw cet::exception("BernFEB_GeneratorBase::Iniitalize")
+	<< "TargetDTPSize " << s << " must be <= FEBDTPBufferCapacity " << FEBDTPBufferCapacity_;
+
+
+  if(MaxTimeDiffs_.size()!=FEBIDs_.size()){
+    if(MaxTimeDiffs_.size()==1){
+      auto size = MaxTimeDiffs_.at(0);
+      MaxTimeDiffs_ = std::vector<uint32_t>(FEBIDs_.size(),size);
+    }
+    else{
+      throw cet::exception("BernFEB_GeneratorBase::Iniitalize")
+	<< "MaxTimeDiffs must be same size as FEBIDs in config!";
+    }
+  }
+
   throttle_usecs_ = ps_.get<size_t>("throttle_usecs", 100000);
   throttle_usecs_check_ = ps_.get<size_t>("throttle_usecs_check", 10000);
-
+  
   if(nChannels_!=32)
     throw cet::exception("BernFEB_GeneratorBase::Initialize")
       << "nChannels != 32. This is not supported.";
@@ -73,9 +105,12 @@ void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
   
   TRACE(TR_LOG,"BernFeb::Initialize() completed");
 
-  for( auto const& id : FEBIDs_)
-    FEBBuffers_[id] = FEBBuffer_t(FEBBufferCapacity_,id);
+						
 
+  for( size_t i_id=0; i_id<FEBIDs_.size(); ++i_id){
+    auto const& id = FEBIDs_[i_id];
+    FEBBuffers_[id] = FEBBuffer_t(FEBBufferCapacity_,MaxTimeDiffs_[i_id],TargetDTPSizes_[i_id],id);
+  }
   FEBDTPBufferUPtr.reset(new BernFEBEvent[FEBDTPBufferCapacity_]);
   TRACE(TR_DEBUG,"\tMade %lu FEBBuffers",FEBIDs_.size());
 
@@ -186,6 +221,12 @@ size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
 	  break;
       }
 
+    //if time difference is too large
+    else
+      if( (this_time.Time()-last_time.Time())>b.max_time_diff )
+	break;
+    
+
     last_time = this_time;
     ++good_events;
   }
@@ -227,11 +268,21 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
   size_t this_n_events=0,n_events=0,new_buffer_size=0;
   for(auto & buf : FEBBuffers_){
     auto & buf_obj = buf.second;
+
+    bool condition = buf_obj.timer.check_time();
+    TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, time=%ld, max_time=%u, pass? %d",
+	  buf_obj.id,std::chrono::nanoseconds(buf_obj.timer.time_end-buf_obj.timer.time_start).count(),buf_obj.timer.buffer_sleep,
+	  condition);
+    if(!condition) continue;
+
     this_n_events = GetFEBData(buf_obj.id)/sizeof(BernFEBEvent);
+
+    int time = buf_obj.timer.end_and_update(this_n_events,MaxDTPSleep_);
+
     new_buffer_size = InsertIntoFEBBuffer(buf_obj,this_n_events);
     n_events += this_n_events;
 
-    TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, n_events=%lu",buf_obj.id,this_n_events);
+    TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, n_events=%lu, time=%d",buf_obj.id,this_n_events,time);
     TRACE(TR_GD_DEBUG,"\tBernFeb::GetData() ... id=0x%lx, buffer_size=%lu",buf_obj.id,buf_obj.buffer.size());
 
     auto id_str = GetFEBIDString(buf_obj.id);

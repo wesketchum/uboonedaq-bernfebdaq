@@ -94,7 +94,7 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
       if(idx==0)
 	n_events=bbm->n_events()+bbm->dropped_events();
       else
-	if(bbm->n_events()!=n_events)
+	if((bbm->n_events()+bbm->dropped_events())!=n_events)
 	  event_mismatch_error = true;
     }
 
@@ -102,8 +102,8 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
       std::cout << "\tFragment ID=0x" << std::hex << bbm->feb_id() << std::dec
 		<< " Time=[  (" << bbm->time_start_seconds_raw() << "," << bbm->time_start_nanosec_raw() << ") , ("
 		<< bbm->time_end_seconds_raw() << "," << bbm->time_end_nanosec_raw() << ")  )"
-		<< " (Events,Missed,Overwritten)=(" << bbm->n_events() << "," 
-		<< bbm->missed_events() << "," << bbm->overwritten_events() << ")"
+		<< " (Events,Missed,Overwritten,Dropped)=(" << bbm->n_events() << "," 
+		<< bbm->missed_events() << "," << bbm->overwritten_events() << bbm->dropped_events() << ")"
 		<< std::endl;
     else if(verbosity_==2)
       std::cout << bbm << std::endl;
