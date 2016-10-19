@@ -144,6 +144,13 @@ void bernfebdaq::BernFEB_GeneratorBase::stop() {
   TRACE(TR_LOG,"BernFeb::stop() completed");
 }
 
+void bernfebdaq::BernFEB_GeneratorBase::stopNoMutex() {
+  TRACE(TR_LOG,"BernFeb::stopNoMutex() called");
+  GetData_thread_->stop();
+  ConfigureStop();
+  TRACE(TR_LOG,"BernFeb::stopNoMutex() completed");
+}
+
 void bernfebdaq::BernFEB_GeneratorBase::Cleanup(){
   TRACE(TR_LOG,"BernFeb::Cleanup() called");
   TRACE(TR_LOG,"BernFeb::Cleanup() completed");
@@ -165,10 +172,10 @@ void bernfebdaq::BernFEB_GeneratorBase::UpdateBufferOccupancyMetrics(uint64_t co
 								     size_t const& buffer_size) const {
 
   std::string id_str = GetFEBIDString(id);
-  metricMan_->sendMetric("BufferOccupancy_"+id_str,buffer_size,"events",5,true);    
+  metricMan_->sendMetric("BufferOccupancy_"+id_str,buffer_size,"events",5,true,"BernFEBGenerator");    
   metricMan_->sendMetric("BufferOccupancyPercent_"+id_str,
 			 ((float)(buffer_size) / (float)(FEBBufferCapacity_))*100.,
-			 "%",5,true);    
+			 "%",5,true,"BernFEBGenerator");    
 }
 
 size_t bernfebdaq::BernFEB_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b, 
@@ -287,7 +294,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 
     auto id_str = GetFEBIDString(buf_obj.id);
 
-    metricMan_->sendMetric("EventsAdded_"+id_str,this_n_events,"events",5,true);
+    metricMan_->sendMetric("EventsAdded_"+id_str,this_n_events,"events",5,true,"BernFEBGenerator");
     UpdateBufferOccupancyMetrics(buf_obj.id,new_buffer_size);
   }
   
@@ -295,7 +302,7 @@ bool bernfebdaq::BernFEB_GeneratorBase::GetData()
 
   GetDataComplete();
 
-  metricMan_->sendMetric("TotalEventsAdded",n_events,"events",5,true);
+  metricMan_->sendMetric("TotalEventsAdded",n_events,"events",5,true,"BernFEBGenerator");
 
   if(n_events>0) return true;
   return false;
@@ -436,8 +443,8 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size after erase = %lu",feb.buffer.size());
 
   auto id_str = GetFEBIDString(feb_id);
-  metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,true,true);
-  metricMan_->sendMetric("TimeErrorDetected_"+id_str,n_TimeErrors_detected,"events",5,true,true);
+  metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,true,"BernFEBGenerator");
+  metricMan_->sendMetric("TimeErrorDetected_"+id_str,n_TimeErrors_detected,"events",5,true,"BernFEBGenerator");
   UpdateBufferOccupancyMetrics(feb_id,new_buffer_size);
   SendMetadataMetrics(metadata);
 
@@ -446,15 +453,15 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
 void bernfebdaq::BernFEB_GeneratorBase::SendMetadataMetrics(BernFEBFragmentMetadata const& m) {
   std::string id_str = GetFEBIDString(m.feb_id());
-  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end_seconds_raw()+m.time_end_nanosec_raw()),"ns",5,true,false);
-  metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true);
-  metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5);
-  metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5);
+  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end_seconds_raw()+m.time_end_nanosec_raw()),"ns",5,false,"BernFEBGenerator");
+  metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true,"BernFEBGenerator");
+  metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5,"BernFEBGenerator");
+  metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5,"BernFEBGenerator");
   float eff=1.0;
   if((m.n_events()+m.missed_events()+m.overwritten_events())!=0)
     eff = (float)(m.n_events()) / (float)(m.n_events()+m.missed_events()+m.overwritten_events());
 
-  metricMan_->sendMetric("Efficiency_"+id_str,eff*100.,"%",5);
+  metricMan_->sendMetric("Efficiency_"+id_str,eff*100.,"%",5,true,"BernFEBGenerator");
 }
 
 bool bernfebdaq::BernFEB_GeneratorBase::getNext_(artdaq::FragmentPtrs & frags) {

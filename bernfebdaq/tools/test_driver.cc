@@ -110,7 +110,7 @@ int main(int argc, char * argv[]) try
   
   ParameterSet metric_pset = fragment_receiver_pset.get<ParameterSet>("metrics");
 
-  std::vector<std::string> names = metric_pset.get_pset_keys();
+  std::vector<std::string> names = metric_pset.get_pset_names();
   for(auto name : names){
     std::cout << "Metric: " << name << "." << std::endl;
     ParameterSet plugin_pset = metric_pset.get<ParameterSet>(name);

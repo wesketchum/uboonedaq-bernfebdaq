@@ -29,6 +29,7 @@ namespace bernfebdaq {
     bool getNext_(artdaq::FragmentPtrs & output) override;
     void start() override;
     void stop() override;
+    void stopNoMutex() override;
 
     uint32_t RunNumber_;
     uint64_t SubrunTimeWindowSize_;
