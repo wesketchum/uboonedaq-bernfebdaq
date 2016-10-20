@@ -100,8 +100,8 @@ void bernfebdaq::BernFEBDump::analyze(art::Event const & evt)
 
     if(verbosity_==1)
       std::cout << "\tFragment ID=0x" << std::hex << bbm->feb_id() << std::dec
-		<< " Time=[  (" << bbm->time_start_seconds_raw() << "," << bbm->time_start_nanosec_raw() << ") , ("
-		<< bbm->time_end_seconds_raw() << "," << bbm->time_end_nanosec_raw() << ")  )"
+		<< " Time=[  (" << bbm->time_start_seconds() << "," << bbm->time_start_nanosec() << ") , ("
+		<< bbm->time_end_seconds() << "," << bbm->time_end_nanosec() << ")  )"
 		<< " (Events,Missed,Overwritten,Dropped)=(" << bbm->n_events() << "," 
 		<< bbm->missed_events() << "," << bbm->overwritten_events() << bbm->dropped_events() << ")"
 		<< std::endl;

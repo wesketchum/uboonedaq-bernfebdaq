@@ -16,6 +16,8 @@
 
 #include "workerThread.h"
 
+#define FEB_OVRFLW_TIME 73741824 //2^30 - 1e9
+
 namespace bernfebdaq {    
 
   class BernFEB_GeneratorBase : public artdaq::CommandableFragmentGenerator{
@@ -81,6 +83,7 @@ namespace bernfebdaq {
     typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
     typedef boost::circular_buffer<timeval>      FEBEventTimeBuffer_t;
     typedef boost::circular_buffer<unsigned int> FEBEventsDroppedBuffer_t;
+    typedef boost::circular_buffer<uint64_t>     FEBEventsCorrectedTimeBuffer_t;
     //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
 
     typedef std::chrono::high_resolution_clock hires_clock;
@@ -123,14 +126,13 @@ namespace bernfebdaq {
 
     typedef struct FEBBuffer{
 
-      FEBEventBuffer_t             buffer;
-      FEBEventTimeBuffer_t         timebuffer;
-      FEBEventsDroppedBuffer_t     droppedbuffer;
+      FEBEventBuffer_t               buffer;
+      FEBEventTimeBuffer_t           timebuffer;
+      FEBEventsDroppedBuffer_t       droppedbuffer;
+      FEBEventsCorrectedTimeBuffer_t correctedtimebuffer;
+
       std::unique_ptr<std::mutex>  mutexptr;
-      size_t                       time_resets;
-      int64_t                      next_time_start;
       uint32_t                     overwritten_counter;
-      int32_t                      last_time_counter;
       uint32_t                     max_time_diff;
       DTPBufferTimer_t             timer;
       uint64_t                     id;
@@ -139,11 +141,9 @@ namespace bernfebdaq {
 	: buffer(FEBEventBuffer_t(capacity)),
 	  timebuffer(FEBEventTimeBuffer_t(capacity)),
 	  droppedbuffer(FEBEventsDroppedBuffer_t(capacity)),
+	  correctedtimebuffer(FEBEventsCorrectedTimeBuffer_t(capacity)),
 	  mutexptr(new std::mutex),
-	  time_resets(0),
-	  next_time_start(0),
 	  overwritten_counter(0),
-	  last_time_counter(-1),
 	  max_time_diff(td),
 	  id(i)
       { Init(); timer.set_target_size(target_dtp_size); timer.t_start(); }
@@ -151,11 +151,9 @@ namespace bernfebdaq {
       void Init() {
 	buffer.clear();
 	timebuffer.clear();
+	correctedtimebuffer.clear();
 	mutexptr->unlock();
-	time_resets = 0;
-	next_time_start = 0;
 	overwritten_counter = 0;
-	last_time_counter = 0;
       }
     } FEBBuffer_t;
 

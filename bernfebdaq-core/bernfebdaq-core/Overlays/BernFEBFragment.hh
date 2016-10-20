@@ -36,23 +36,19 @@ public:
   BernFEBFragmentMetadata(){}
 
   BernFEBFragmentMetadata(uint32_t ts_s, uint32_t ts_ns, 
-			  uint32_t ts_s_ntp, uint32_t ts_ns_ntp,
 			  uint32_t te_s, uint32_t te_ns,
-			  uint32_t te_s_ntp, uint32_t te_ns_ntp,
-			  uint32_t r, uint32_t sr, uint32_t seq,
+			  double f, uint64_t t_o,
+			  uint32_t r, uint32_t seq,
 			  uint64_t fid, uint32_t rid,
 			  uint32_t nch, uint32_t nadc)
     :
-    _time_start_seconds_raw(ts_s),
-    _time_start_nanosec_raw(ts_ns),
-    _time_start_seconds_ntp(ts_s_ntp),
-    _time_start_nanosec_ntp(ts_ns_ntp),
-    _time_end_seconds_raw(te_s),
-    _time_end_nanosec_raw(te_ns),
-    _time_end_seconds_ntp(te_s_ntp),
-    _time_end_nanosec_ntp(te_ns_ntp),
+    _time_start_seconds(ts_s),
+    _time_start_nanosec(ts_ns),
+    _time_end_seconds(te_s),
+    _time_end_nanosec(te_ns),
+    _time_correction_factor(f),
+    _time_offset(t_o),
     _run_number(r),
-    _subrun_number(sr),
     _sequence_number(seq),
     _feb_id(fid),
     _reader_id(rid),
@@ -65,18 +61,16 @@ public:
     _n_datagrams(0)    
   { CheckTimeWindow(); }
 
-  uint32_t const& time_start_seconds_raw() const { return _time_start_seconds_raw; }
-  uint32_t const& time_start_nanosec_raw() const { return _time_start_nanosec_raw; }
-  uint32_t const& time_start_seconds_ntp() const { return _time_start_seconds_ntp; }
-  uint32_t const& time_start_nanosec_ntp() const { return _time_start_nanosec_ntp; }
+  uint32_t const& time_start_seconds() const { return _time_start_seconds; }
+  uint32_t const& time_start_nanosec() const { return _time_start_nanosec; }
 
-  uint32_t const& time_end_seconds_raw() const { return _time_end_seconds_raw; }
-  uint32_t const& time_end_nanosec_raw() const { return _time_end_nanosec_raw; }
-  uint32_t const& time_end_seconds_ntp() const { return _time_end_seconds_ntp; }
-  uint32_t const& time_end_nanosec_ntp() const { return _time_end_nanosec_ntp; }
+  uint32_t const& time_end_seconds() const { return _time_end_seconds; }
+  uint32_t const& time_end_nanosec() const { return _time_end_nanosec; }
+
+  double   const& time_correction_factor() const { return _time_correction_factor; }
+  uint64_t const& time_offset() const { return _time_offset; }
 
   uint32_t const& run_number()         const { return _run_number; }
-  uint32_t const& subrun_number()      const { return _subrun_number; }
   uint32_t const& sequence_number()    const { return _sequence_number; }
   uint64_t const& feb_id()             const { return _feb_id; }
   uint32_t const& reader_id()          const { return _reader_id; }
@@ -101,18 +95,15 @@ public:
 
 private:
 
-  uint32_t _time_start_seconds_raw; //time since start of run, basically, according to FEBs
-  uint32_t _time_start_nanosec_raw; //time since start of run, basically, according to FEBs
-  uint32_t _time_start_seconds_ntp; //time since start of epoch, system time
-  uint32_t _time_start_nanosec_ntp; //time since start of epoch, system time
+  uint32_t _time_start_seconds; //time at fragment start, seconds
+  uint32_t _time_start_nanosec; //time at fragment start, nanoseconds
+  uint32_t _time_end_seconds; //time at fragment end, seconds
+  uint32_t _time_end_nanosec; //time at fragment end, nanoseconds
 
-  uint32_t _time_end_seconds_raw; //time since start of run, basically
-  uint32_t _time_end_nanosec_raw; //time since start of run, basically
-  uint32_t _time_end_seconds_ntp; //time since start of epoch
-  uint32_t _time_end_nanosec_ntp; //time since start of epoch
+  double _time_correction_factor;
+  uint64_t _time_offset;
 
   uint32_t _run_number;
-  uint32_t _subrun_number;
   uint32_t _sequence_number;
 
   uint64_t _feb_id; //mac address
