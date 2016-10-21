@@ -47,3 +47,18 @@ simple_plugin(BernFEBData "generator"
   ${MF_UTILITIES}
   ${CETLIB}
   )
+
+simple_plugin(BernFEBDataZMQ "generator"
+  bernfebdaq-BernFEB_GeneratorBase
+  bernfebdaq-core_Overlays
+  zmq
+  artdaq_Application
+  artdaq_DAQdata
+  artdaq-core_Utilities
+  artdaq-core_Data
+  ${ART_UTILITIES}
+  ${FHICLCPP}
+  ${MF_MESSAGELOGGER}
+  ${MF_UTILITIES}
+  ${CETLIB}
+  )
