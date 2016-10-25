@@ -464,7 +464,8 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
 							bernfebdaq::detail::FragmentType::BernZMQ, metadata) );
     std::copy(feb.buffer.begin()+i_b,feb.buffer.begin()+i_e,(BernZMQEvent*)(frags.back()->dataBegin()));
 
-    TRACE(TR_FF_DEBUG,"BernZMQ::FillFragment() : Fragment created. First event in fragment: %s",
+    TRACE(TR_FF_DEBUG,"BernZMQ::FillFragment() : Fragment created. Type %d. First event in fragment: %s",
+	  bernfebdaq::detail::FragmentType::BernZMQ,
 	  ((BernZMQEvent*)(frags.back()->dataBegin()))->c_str() );
     
     TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : Fragment created. Events=%u. Metadata : %s",
