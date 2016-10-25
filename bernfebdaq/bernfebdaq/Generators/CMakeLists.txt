@@ -18,6 +18,22 @@ art_make_library( LIBRARY_NAME bernfebdaq-BernFEB_GeneratorBase
 			${CETLIB}
 		)
 
+art_make_library( LIBRARY_NAME bernfebdaq-BernZMQ_GeneratorBase
+		  SOURCE BernZMQ_GeneratorBase.cc
+		  LIBRARIES
+			bernfebdaq-core_Overlays
+			bernfebdaq-WorkerThread
+			artdaq_Application
+			artdaq_DAQdata
+			artdaq-core_Utilities
+			artdaq-core_Data
+			${ART_UTILITIES}
+			${FHICLCPP}
+			${MF_MESSAGELOGGER}
+			${MF_UTILITIES}
+			${CETLIB}
+		)
+
 simple_plugin(BernFEBFakeData "generator"
   bernfebdaq-BernFEB_GeneratorBase
   bernfebdaq-core_Overlays
@@ -48,8 +64,8 @@ simple_plugin(BernFEBData "generator"
   ${CETLIB}
   )
 
-simple_plugin(BernFEBDataZMQ "generator"
-  bernfebdaq-BernFEB_GeneratorBase
+simple_plugin(BernZMQData "generator"
+  bernfebdaq-BernZMQ_GeneratorBase
   bernfebdaq-core_Overlays
   zmq
   artdaq_Application
