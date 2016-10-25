@@ -8,6 +8,7 @@ namespace bernfebdaq {
     enum FragmentType : artdaq::Fragment::type_t
     { MISSED = artdaq::Fragment::FirstUserFragmentType,
 	BernFEB,
+	BernZMQ,
         INVALID // Should always be last.
         };
 
