@@ -18,8 +18,8 @@ bernfebdaq::BernFEBDataZMQ::BernFEBDataZMQ(fhicl::ParameterSet const & ps)
 {
   TRACE(TR_LOG,"BernFEBDataZMQ constructor called");  
 
-  zmq_data_pub_port_           = ps_.get<std::string>("data_pub_port");
-  zmq_data_receive_timeout_ms_ = ps_.get<int>("data_receive_timeout_ms",500);
+  zmq_data_pub_port_           = ps_.get<std::string>("zmq_data_pub_port");
+  zmq_data_receive_timeout_ms_ = ps_.get<int>("zmq_data_receive_timeout_ms",500);
 
   TRACE(TR_LOG,"BernFEBDataZMQ constructor : Calling zmq subscriber with port %s",zmq_data_pub_port_.c_str());  
   
@@ -49,7 +49,7 @@ void bernfebdaq::BernFEBDataZMQ::ConfigureStart(){
     TRACE(TR_ERROR,"BernFEBDataZMQZMQ::ConfigureStart() failed to connect.");
 
   res = zmq_setsockopt(zmq_subscriber_,ZMQ_SUBSCRIBE,NULL,0);
-  res = zmq_setsockopt(zmq_subscriber_,ZMQ_RCVTIMEO,&zmq_data_receive_timeout_ms_,2);
+  //res = zmq_setsockopt(zmq_subscriber_,ZMQ_RCVTIMEO,&zmq_data_receive_timeout_ms_,2);
 
   if(res!=0)
     TRACE(TR_ERROR,"BernFEBDataZMQZMQ::ConfigureStart() socket options failed.");
@@ -77,12 +77,22 @@ size_t bernfebdaq::BernFEBDataZMQ::GetFEBData(uint64_t const& feb_id){
   TRACE(TR_GD_LOG,"BernFEBDataZMQ::GetFEBData(0x%lx) called",feb_id);  
 
   size_t data_size=0;
-  size_t events=0;
+  //size_t events=0;
 
   zmq_msg_t feb_data_msg;
-  int res = zmq_msg_recv(&feb_data_msg,zmq_subscriber_,0);
+  zmq_msg_init(&feb_data_msg);
+  while(zmq_msg_recv(&feb_data_msg,zmq_subscriber_,ZMQ_DONTWAIT)<0){
+    //TRACE(TR_GD_DEBUG,"BernFEBDataZMQ::GetFEBData() called and no data/error.");
+    usleep(1000);
+    //return 0;
+  }
 
-  if(res==0 && zmq_msg_size(&feb_data_msg)>0){
+  TRACE(TR_GD_LOG,"BernFEBDataZMQ::GetFEBData() size returned was %lu",zmq_msg_size(&feb_data_msg));
+  
+  if(zmq_msg_size(&feb_data_msg)>0){
+
+    TRACE(TR_GD_LOG,"BernFEBDataZMQ::GetFEBData() size returned was %lu",zmq_msg_size(&feb_data_msg));
+    /*
     std::copy((uint8_t*)zmq_msg_data(&feb_data_msg),
 	      (uint8_t*)zmq_msg_data(&feb_data_msg)+zmq_msg_size(&feb_data_msg)-sizeof(BernFEBEvent), //last event contains time info
 	      reinterpret_cast<uint8_t*>(&FEBDTPBufferUPtr[events]));
@@ -95,7 +105,10 @@ size_t bernfebdaq::BernFEBDataZMQ::GetFEBData(uint64_t const& feb_id){
       TRACE(TR_ERROR,"BernFEBDataZMQ::GetFEBData(0x%lx) : Too many events in FEB buffer! %lu",feb_id,events);
       throw cet::exception("In BernFEBDataZMQ::GetFebData, Too many events in FEB buffer!");
     }
+    */
   }
+
+  zmq_msg_close(&feb_data_msg);
 
   return data_size;
 
