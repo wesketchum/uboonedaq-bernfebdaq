@@ -86,18 +86,21 @@ size_t bernfebdaq::BernZMQData::GetZMQData(){
     usleep(1000);
     //return 0;
   }
-
-  TRACE(TR_GD_LOG,"BernZMQData::GetFEBData() size returned was %lu",zmq_msg_size(&feb_data_msg));
   
   if(zmq_msg_size(&feb_data_msg)>0){
 
+    TRACE(TR_GD_DEBUG,"BernZMQData::GetZMQData() about to copy");
     
     std::copy((uint8_t*)zmq_msg_data(&feb_data_msg),
-	      (uint8_t*)zmq_msg_data(&feb_data_msg)+zmq_msg_size(&feb_data_msg)-sizeof(BernZMQEvent), //last event contains time info
+	      (uint8_t*)zmq_msg_data(&feb_data_msg)+zmq_msg_size(&feb_data_msg), //last event contains time info
 	      reinterpret_cast<uint8_t*>(&ZMQBufferUPtr[events]));
+
+    TRACE(TR_GD_DEBUG,"BernZMQData::GetZMQData() copied!");
 
     events += zmq_msg_size(&feb_data_msg)/sizeof(BernZMQEvent);
     data_size += zmq_msg_size(&feb_data_msg);
+
+    TRACE(TR_GD_DEBUG,"BernZMQData::GetZMQData() copied %lu events (%lu size)",events,data_size);
 
     //check : is this too much data for the buffer?
     if( events>ZMQBufferCapacity_ ){
@@ -108,6 +111,8 @@ size_t bernfebdaq::BernZMQData::GetZMQData(){
   }
 
   zmq_msg_close(&feb_data_msg);
+
+  TRACE(TR_GD_LOG,"BernZMQData::GetZMQData() size returned was %lu",data_size);
 
   return data_size;
 

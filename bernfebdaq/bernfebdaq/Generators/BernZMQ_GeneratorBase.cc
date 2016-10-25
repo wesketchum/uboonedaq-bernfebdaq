@@ -96,6 +96,7 @@ void bernfebdaq::BernZMQ_GeneratorBase::Initialize(){
   auto getData_worker = WorkerThread::createWorkerThread(worker_functor);
   GetData_thread_.swap(getData_worker);
 
+  SeqIDMinimumSec_ = 0;
 }
 
 void bernfebdaq::BernZMQ_GeneratorBase::start() {
@@ -159,6 +160,9 @@ size_t bernfebdaq::BernZMQ_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
 							      size_t nevents,
 							      size_t total_events){
   
+  TRACE(TR_DEBUG,"FEB ID 0x%lx. Current buffer size %lu / %lu. Want to add %lu events.",
+	b.id,b.buffer.size(),b.buffer.capacity(),nevents);
+
   timeval timenow; gettimeofday(&timenow,NULL);
 
   //don't fill while we wait for available capacity...
@@ -220,7 +224,11 @@ size_t bernfebdaq::BernZMQ_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
   //what is used later for the filling process to determing number of events. 
   //determining number of events is an unlocked procedure
 
-  timeb time_poll_finished = *((timeb*)(&(ZMQBufferUPtr[total_events-1].adc[0])+sizeof(int)+sizeof(struct timeb)));
+  timeb time_poll_finished = *((timeb*)((char*)(ZMQBufferUPtr[total_events-1].adc)+sizeof(int)+sizeof(struct timeb)));
+
+  TRACE(TR_DEBUG,"Last event looks like \n %s",ZMQBufferUPtr[total_events-1].c_str());
+  TRACE(TR_DEBUG,"Time is %ld, %hu",time_poll_finished.time,time_poll_finished.millitm);
+
   timenow.tv_sec = time_poll_finished.time;
   timenow.tv_usec = time_poll_finished.millitm*1000;
 
@@ -260,16 +268,25 @@ bool bernfebdaq::BernZMQ_GeneratorBase::GetData()
   //this fills the data from the ZMQ buffer
   size_t total_events = GetZMQData()/sizeof(BernZMQEvent);
 
+  TRACE(TR_GD_DEBUG,"\tBernZMQ::GetData() got %lu total events",total_events);
+
   if(total_events>0){
     
     size_t i_e=0;
     size_t this_n_events=0;
-    uint64_t prev_mac = (FEBIDs_[0] & 0xffffffffffff0000) + ZMQBufferUPtr[0].MAC5();
+    uint64_t prev_mac = (FEBIDs_[0] & 0xffffffffffffff00) + ZMQBufferUPtr[0].MAC5();
     size_t new_buffer_size = 0;
+
+    TRACE(TR_GD_DEBUG,"\tBernZMQ::GetData() start sorting with mac=0x%lx",prev_mac);
+
     while(i_e<total_events){
       
       auto const& this_event = ZMQBufferUPtr[i_e];
-      if(prev_mac!=this_event.MAC5()){
+      if((prev_mac&0xff)!=this_event.MAC5()){
+
+	TRACE(TR_GD_DEBUG,"\tBernZMQ::GetData() found new MAC (0x%x)! prev_mac=0x%lx, iterator=%lu this_events=%lu",
+	      this_event.MAC5(),(prev_mac&0xff),i_e,this_n_events);
+
 	new_buffer_size = InsertIntoFEBBuffer(FEBBuffers_[prev_mac],i_e-this_n_events,this_n_events,total_events);
 
 	TRACE(TR_GD_DEBUG,"\tBernZMQ::GetData() ... id=0x%lx, n_events=%lu, buffer_size=%lu",
@@ -282,7 +299,7 @@ bool bernfebdaq::BernZMQ_GeneratorBase::GetData()
 	this_n_events=0;
       }
 
-      prev_mac = (prev_mac & 0xffffffffffff0000) + this_event.MAC5();
+      prev_mac = (prev_mac & 0xffffffffffffff00) + this_event.MAC5();
       ++i_e; ++this_n_events;
     }
 
@@ -325,11 +342,15 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
     
 
     if(this_event.IsReference_TS0()){
+      TRACE(TR_FF_LOG,"BernZMQ::FillFragment() Found reference pulse at i_e=%lu, time=%u",
+	    i_e,this_event.Time_TS0());
       i_gps=i_e;
     }
-    else if(this_event.Time_TS0()<last_time && this_event.IsOverflow_TS0())
+    else if(this_event.Time_TS0()<last_time && this_event.IsOverflow_TS0()){
       n_wraparounds++;
-
+      TRACE(TR_FF_LOG,"BernZMQ::FillFragment() Found wraparound pulse at i_e=%lu, time=%u (last_time=%u), n=%lu",
+	    i_e,this_event.Time_TS0(),last_time,n_wraparounds);
+    }
     feb.correctedtimebuffer[i_e] = (this_event.Time_TS0()+(uint64_t)n_wraparounds*0x40000000);
     last_time = this_event.Time_TS0();
 
@@ -340,8 +361,7 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
     TRACE(TR_FF_LOG,"BernZMQ::FillFragment() completed, buffer not empty, but waiting for GPS pulse.");
     return false;
   }
-  
-  
+    
   //determine how much time passed. should be close to corrected time.
   //then determine the correction.
   uint32_t elapsed_secs = (feb.correctedtimebuffer[i_gps]/1e9);
@@ -349,11 +369,16 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
     elapsed_secs+=1;
   time_correction = 1.0e9*(double)elapsed_secs / (double)(feb.correctedtimebuffer[i_gps]);
   
-  
+  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : time correction is %lf, with elapsed_sec=%u and corrected_time=%lu",
+	time_correction,elapsed_secs,feb.correctedtimebuffer[i_gps]);
+
   //ok, so now, determine the nearest second for the last event (closest to one second), based on ntp time
   //get the usecs from the timeval
   auto gps_timeval = feb.timebuffer.at(i_gps);
   
+  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : GPS time was at %ld sec and %ld usec",
+	gps_timeval.tv_sec,gps_timeval.tv_usec);
+
   //report remainder as a metric to watch for
   std::string id_str = GetFEBIDString(feb_id);
   metricMan_->sendMetric("BoundaryTimeRemainder_"+id_str,(float)(gps_timeval.tv_usec),"microseconds",false,"BernZMQGenerator");
@@ -365,14 +390,20 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
   gps_timeval.tv_usec = 0;
 
 
+
   uint32_t frag_begin_time_s = gps_timeval.tv_sec-elapsed_secs;
   uint32_t frag_begin_time_ns = 0;
   uint32_t frag_end_time_s = gps_timeval.tv_sec-elapsed_secs;
   uint32_t frag_end_time_ns = SequenceTimeWindowSize_;
   
+  if(SeqIDMinimumSec_==0){
+    SeqIDMinimumSec_ = frag_begin_time_s - 10;
+  }
+
   i_e=0;
   last_time=0;
   uint64_t time_offset=0;
+  size_t i_b=0;
   while(frag_end_time_s < gps_timeval.tv_sec){
 
     if(frag_end_time_ns>=1000000000){
@@ -385,23 +416,32 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
       frag_begin_time_s+=1;
     }
 
+    //ms since Jan 1 2015
+    uint32_t seq_id = (frag_begin_time_s-SeqIDMinimumSec_)*1000 + (frag_begin_time_ns/1000000);
+
     //make metadata object
     BernZMQFragmentMetadata metadata(frag_begin_time_s,frag_begin_time_ns,
 				     frag_end_time_s,frag_end_time_ns,
 				     time_correction,time_offset,
 				     RunNumber_,
-				     (frag_begin_time_s*1000)+(frag_begin_time_ns/1000000), //sequence id is ms since epoch
+				     seq_id,
 				     feb_id, ReaderID_,
 				     nChannels_,nADCBits_);
+
+    TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : looking for events in frag %u,%u (%u ms)",
+	  frag_begin_time_s,frag_begin_time_ns,seq_id);
     
     while(i_e<i_gps+1){
       
       auto const& this_corrected_time = feb.correctedtimebuffer[i_e];
+      auto const& this_event = feb.buffer[i_e];
       
-      if( (double)this_corrected_time*time_correction > frag_end_time_s*1e9+frag_end_time_ns )
+      TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : event %lu, time=%u, corrected_time=%ld",
+	    i_e,this_event.Time_TS0(),this_corrected_time);
+      
+      if( (double)this_corrected_time*time_correction > (frag_end_time_s-(gps_timeval.tv_sec-elapsed_secs))*1e9+frag_end_time_ns )
 	break;
 
-      auto const& this_event = feb.buffer[i_e];
 
       if(this_event.Time_TS0()<last_time)
 	time_offset += 0x40000000;
@@ -422,8 +462,8 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
     frags.emplace_back( artdaq::Fragment::FragmentBytes(metadata.n_events()*sizeof(BernZMQEvent),  
 							metadata.sequence_number(),feb_id,
 							bernfebdaq::detail::FragmentType::BernZMQ, metadata) );
-    std::copy(feb.buffer.begin(),feb.buffer.begin()+buffer_end,(BernZMQEvent*)(frags.back()->dataBegin()));
-    
+    std::copy(feb.buffer.begin()+i_b,feb.buffer.begin()+i_e,(BernZMQEvent*)(frags.back()->dataBegin()));
+
     TRACE(TR_FF_DEBUG,"BernZMQ::FillFragment() : Fragment created. First event in fragment: %s",
 	  ((BernZMQEvent*)(frags.back()->dataBegin()))->c_str() );
     
@@ -431,6 +471,11 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
 	  metadata.n_events(),metadata.c_str());
         
     SendMetadataMetrics(metadata);
+
+
+    i_b=i_e; //new beginning...
+    frag_begin_time_ns += SequenceTimeWindowSize_;
+    frag_end_time_ns += SequenceTimeWindowSize_;
   }
 
   TRACE(TR_FF_DEBUG,"BernZMQ::FillFragment() : Buffer size before erase = %lu",feb.buffer.size());

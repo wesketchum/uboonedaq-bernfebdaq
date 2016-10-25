@@ -126,6 +126,8 @@ namespace bernfebdaq {
     uint32_t FEBBufferCapacity_;
     uint32_t FEBBufferSizeBytes_;
 
+    uint32_t SeqIDMinimumSec_;
+
     bool GetData();
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
 
