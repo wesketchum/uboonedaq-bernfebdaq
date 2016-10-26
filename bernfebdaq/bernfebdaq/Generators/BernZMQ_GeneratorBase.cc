@@ -329,7 +329,7 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
   TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : Fragment Searching. Total events in buffer=%lu.",
 	buffer_end);
 
-  double time_correction = -1.0;
+  int time_correction;
 
   //find GPS pulse and count wraparounds
   size_t i_gps=buffer_end;
@@ -367,9 +367,9 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
   uint32_t elapsed_secs = (feb.correctedtimebuffer[i_gps]/1e9);
   if(feb.correctedtimebuffer[i_gps]%1000000000 > 500000000)
     elapsed_secs+=1;
-  time_correction = 1.0e9*(double)elapsed_secs / (double)(feb.correctedtimebuffer[i_gps]);
+  time_correction = (int)(elapsed_secs*1000000000) - (int)(feb.correctedtimebuffer[i_gps]);
   
-  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : time correction is %lf, with elapsed_sec=%u and corrected_time=%lu",
+  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : time correction is %d, with elapsed_sec=%u and corrected_time=%lu",
 	time_correction,elapsed_secs,feb.correctedtimebuffer[i_gps]);
 
   //ok, so now, determine the nearest second for the last event (closest to one second), based on ntp time

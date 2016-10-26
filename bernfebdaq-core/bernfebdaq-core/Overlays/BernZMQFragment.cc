@@ -15,7 +15,7 @@ std::ostream & bernfebdaq::operator << (std::ostream & os, BernZMQFragmentMetada
   os << "\nBernZMQFragmentMetadata:"
      << "\n\tTime window start: " << m.time_start_seconds() << " s, " << m.time_start_nanosec() << " ns" 
      << "\n\tTime window end: " << m.time_end_seconds() << " s, " << m.time_end_nanosec() << " ns" 
-     << "\n\tRaw time correction factor: " << m.time_correction_factor()
+     << "\n\tRaw time correction factor: " << m.time_correction_diff()
      << "\n\tRaw time offset: " << m.time_offset()
      << "\n\tRun number: " << m.run_number()
      << "\n\tSequence number: " << m.sequence_number()

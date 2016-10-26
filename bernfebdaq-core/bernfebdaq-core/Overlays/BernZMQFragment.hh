@@ -36,7 +36,7 @@ public:
 
   BernZMQFragmentMetadata(uint32_t ts_s, uint32_t ts_ns, 
 			  uint32_t te_s, uint32_t te_ns,
-			  double f, uint64_t t_o,
+			  int t_c, uint64_t t_o,
 			  uint32_t r, uint32_t seq,
 			  uint64_t fid, uint32_t rid,
 			  uint32_t nch, uint32_t nadc)
@@ -45,7 +45,7 @@ public:
     _time_start_nanosec(ts_ns),
     _time_end_seconds(te_s),
     _time_end_nanosec(te_ns),
-    _time_correction_factor(f),
+    _time_correction_diff(t_c),
     _time_offset(t_o),
     _run_number(r),
     _sequence_number(seq),
@@ -66,7 +66,7 @@ public:
   uint32_t const& time_end_seconds() const { return _time_end_seconds; }
   uint32_t const& time_end_nanosec() const { return _time_end_nanosec; }
 
-  double   const& time_correction_factor() const { return _time_correction_factor; }
+  int      const& time_correction_diff() const { return _time_correction_diff; }
   uint64_t const& time_offset() const { return _time_offset; }
 
   uint32_t const& run_number()         const { return _run_number; }
@@ -99,7 +99,7 @@ private:
   uint32_t _time_end_seconds; //time at fragment end, seconds
   uint32_t _time_end_nanosec; //time at fragment end, nanoseconds
 
-  double _time_correction_factor;
+  int _time_correction_diff;
   uint64_t _time_offset;
 
   uint32_t _run_number;
