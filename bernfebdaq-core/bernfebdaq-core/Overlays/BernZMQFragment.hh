@@ -126,6 +126,8 @@ struct bernfebdaq::BernZMQEvent{
   //typedef struct {
   uint16_t mac5;
   uint16_t flags;
+  uint16_t lostcpu;
+  uint16_t lostfpga;
   uint32_t ts0;
   uint32_t ts1;
   uint16_t adc[32];

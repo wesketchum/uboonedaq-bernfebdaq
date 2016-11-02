@@ -38,6 +38,8 @@ std::ostream & bernfebdaq::operator << (std::ostream & os, BernZMQEvent const & 
   os << "\nBernZMQEvent"
      << "\n\tMAC5: " << std::hex << e.MAC5() << std::dec;
   os << "\n\tFlags word: " << std::hex << e.flags << std::dec;
+  os << "\n\tLostCPU: " << e.lostcpu;
+  os << "\n\tLostFPGA: " << e.lostfpga;
   os << "\n\tTime1 (TS0): " << e.Time_TS0();
   os << "\n\tTime2 (TS1): " << e.Time_TS1();
   os << std::hex;

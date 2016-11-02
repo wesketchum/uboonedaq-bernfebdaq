@@ -428,6 +428,8 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
 				     feb_id, ReaderID_,
 				     nChannels_,nADCBits_);
 
+    double time_corr_factor = 1.0e9 / (1000000000 - time_correction);
+    
     TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : looking for events in frag %u,%u (%u ms)",
 	  frag_begin_time_s,frag_begin_time_ns,seq_id);
     
@@ -436,24 +438,24 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
       auto const& this_corrected_time = feb.correctedtimebuffer[i_e];
       auto const& this_event = feb.buffer[i_e];
       
-      TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : event %lu, time=%u, corrected_time=%ld",
-	    i_e,this_event.Time_TS0(),this_corrected_time);
+      TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : event %lu, time=%u, corrected_time=%lf",
+	    i_e,this_event.Time_TS0(),(double)this_corrected_time*time_corr_factor);
       
-      if( (double)this_corrected_time*time_correction > (frag_end_time_s-(gps_timeval.tv_sec-elapsed_secs))*1e9+frag_end_time_ns )
+      if( (double)this_corrected_time*time_corr_factor > (frag_end_time_s-(gps_timeval.tv_sec-elapsed_secs))*1e9+frag_end_time_ns )
 	break;
 
 
       if(this_event.Time_TS0()<last_time)
 	time_offset += 0x40000000;
 
-      /*
-      if(this_event.flags.overwritten > feb.overwritten_counter)
-	metadata.increment(this_event.flags.missed,this_event.flags.overwritten-feb.overwritten_counter,feb.droppedbuffer[i_e]);
+      
+      if(this_event.lostcpu > feb.overwritten_counter)
+	metadata.increment(this_event.lostfpga,this_event.lostcpu-feb.overwritten_counter,feb.droppedbuffer[i_e]);
       else
-	metadata.increment(this_event.flags.missed,0,feb.droppedbuffer[i_e]);
-      feb.overwritten_counter = this_event.flags.overwritten;
-      */
-      metadata.increment(0,0,feb.droppedbuffer[i_e]);
+	metadata.increment(this_event.lostfpga,0,feb.droppedbuffer[i_e]);
+      feb.overwritten_counter = this_event.lostcpu;
+      
+      //metadata.increment(this_event.lostfpga,this_event.lostcpu,feb.droppedbuffer[i_e]);
 
       ++i_e;
     }
