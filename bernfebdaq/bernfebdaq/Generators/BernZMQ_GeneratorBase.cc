@@ -34,7 +34,8 @@ void bernfebdaq::BernZMQ_GeneratorBase::Initialize(){
   
   TRACE(TR_LOG,"BernFeb::Initialze() called");
 
-  RunNumber_ = ps_.get<uint32_t>("RunNumber",999);
+  //RunNumber_ = ps_.get<uint32_t>("RunNumber",999);
+  RunNumber_ = 0;
   SubrunTimeWindowSize_ = ps_.get<uint64_t>("SubRunTimeWindowSize",60e9); //one minute
   SequenceTimeWindowSize_ = ps_.get<uint32_t>("SequenceTimeWindowSize",5e6); //5 ms
   nADCBits_  = ps_.get<uint8_t>("nADCBits",12);
@@ -103,6 +104,7 @@ void bernfebdaq::BernZMQ_GeneratorBase::start() {
 
   TRACE(TR_LOG,"BernFeb::start() called");
 
+  RunNumber_ = run_number();
   current_subrun_ = 0;
 
   for(auto & buf : FEBBuffers_)

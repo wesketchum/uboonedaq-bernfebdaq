@@ -1,0 +1,92 @@
+#include "xmlrpc_client_list.fcl"
+
+services: {
+
+  scheduler: {
+    fileMode: NOMERGE
+    errorOnFailureToPut: false
+  }
+
+  NetMonTransportServiceInterface: {
+    service_provider: NetMonTransportService
+    max_fragment_size_words: 3000000
+  }
+
+  #SimpleMemoryCheck: { }
+
+}
+
+daq: {
+
+  max_fragment_size_words: 3000000
+
+  aggregator: {
+
+    mpi_buffer_count: 1
+    first_event_builder_rank: 3
+    event_builder_count: 1
+    expected_events_per_bunch: 1
+    print_event_store_stats: true
+    event_queue_depth: 20
+    event_queue_wait_time: 5
+    onmon_event_prescale: 1
+    xmlrpc_client_list: @local::xmlrpc_client_list_common
+
+    file_size_MB: 0.0
+    file_duration: 0
+    file_event_count: 0
+    is_data_logger: true
+
+  }
+
+  metrics: {
+
+    #graphite:{
+      #level: 5
+      #metricPluginType: "graphite"
+      #host: "ubdaq-prod-crtevb"
+      #port: 8080
+      #namespace: "artdaq."
+    #}
+
+  }#end metrics
+
+
+  transfer_to_dispatcher: {
+
+    transerPluginType: Shmem
+    unique_label: "shared_memory_between_data_logger_and_dispatcher"
+
+    max_fragment_size_words: 3000000
+    first_event_builder_rank: 3
+
+  }
+
+}
+
+
+source: {
+  module_type: NetMonInput
+}
+
+outputs: {
+
+  normalOutput: {
+    module_type: RootOutput
+    fileName: "uboone_bernfebdaq_%06r_%06s_%06S_%to_%tc.root"
+    compressionLevel: 1
+  }
+}
+
+physics:{
+
+  analyzers: {}
+  producers: {}
+  filters:   {}
+
+  my_output_modules: [ normalOutput ]
+
+  end_paths: [ my_output_modules ]
+}
+
+process_name: DAQAG

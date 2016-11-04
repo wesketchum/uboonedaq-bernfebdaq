@@ -1,0 +1,89 @@
+services: {
+
+  scheduler: {
+    fileMode: NOMERGE
+    errorOnFailureToPut: false
+  }
+
+  NetMonTransportServiceInterface: {
+    service_provider: NetMonTransportService
+    #first_data_receiver_rank: 4
+    first_data_receiver_rank: 1
+    mpi_buffer_count: 1
+    max_fragment_size_words: 3000000
+    data_receiver_count: 1
+    #broadcast_sends: true
+  }
+
+  #SimpleMemoryCheck: { }
+
+}
+
+daq: {
+
+  max_fragment_size_words: 3000000
+
+  event_builder: {
+
+    mpi_buffer_count: 16
+    first_fragment_receiver_rank: 0
+    #fragment_receiver_count: 3
+    fragment_receiver_count: 1
+    expected_fragments_per_event: 13
+ 
+    use_art: true
+    print_event_store_stats: true
+    verbose: false
+    send_triggers: false
+
+    metrics: {
+
+      #graphite:{
+        #level: 5
+        #metricPluginType: "graphite"
+        #host: "ubdaq-prod-crtevb"
+        #port: 8080
+        #namespace: "artdaq."
+      #}
+
+    }#end metrics
+
+  }
+
+}
+
+outputs: {
+
+  rootMPIOutput: {
+    module_type: RootMPIOutput    
+  }
+
+  directFile: {
+    module_type: RootOutput
+    fileName: "uboone_bernfebdaq_%06r_%06s_%06S_%to_%tc.root"
+    compressionLevel: 1
+  }
+
+}
+
+physics: {
+
+  analyzers: {}
+  producers: {}
+  filters:   {}
+
+  my_output_modules: [ directFile ]
+
+  end_paths: [ my_output_modules ]
+}
+
+source: {
+
+  module_type: RawInput
+  waiting_time: 2500000
+  resume_after_timeout: true
+  fragment_type_map: [ [1,"MISSED"], [2,"BernFEB"], [3,"BernZMQ"] ]
+
+}
+
+process_name: DAQ
