@@ -28,7 +28,7 @@ CONFIGDUMP=`fhicl-dump ${CONFIGFILE}`
 
 CONFIG=`echo "$CONFIGDUMP" | sed 's/{/\\\\{/g' | sed 's/:/\\\\:/g' | sed 's/,/\\\\,/g' | sed 's/}/\\\\}/g'`
 
-#echo $CONFIG
+echo $CONFIG
 
 #xmlrpc $NODE:$PORT/RPC2 daq.init "$(<$CONFIGFILE)"
 xmlrpc $NODE:$PORT/RPC2 daq.init "$CONFIG"

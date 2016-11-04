@@ -82,7 +82,8 @@ source: {
   module_type: RawInput
   waiting_time: 2500000
   resume_after_timeout: true
-  fragment_type_map: [ [1,"MISSED"], [2,"BernFEB"], [3,"BernZMQ"] ]
+  fragment_type_map: [ [ 1,"MISSED"  ], 
+		       [ 3,"BernZMQ" ] ]
 
 }
 
