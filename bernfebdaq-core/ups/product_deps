@@ -1,6 +1,6 @@
 # The parent line must be the first non-comment line in the file
 # This line defines the product name and version
-parent bernfebdaq_core		v0_02_00
+parent bernfebdaq_core		v00_03_00
 defaultqual	e10:s41
 
 # These optional lines define the installed directories where
