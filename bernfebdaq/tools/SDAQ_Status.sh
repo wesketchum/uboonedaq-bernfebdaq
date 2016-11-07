@@ -2,14 +2,14 @@
 
 source setup.sh
 
-HOST=(`hostname -s`)
-
-echo "STATUS: BoardReader:"
-./daq_status_common.sh -n ${HOST} -p 5205
+echo "STATUS: BoardReaders:"
+daq_status_common.sh -n ubdaq-prod-crt02 -p 5205
+daq_status_common.sh -n ubdaq-prod-crt03 -p 5205
+daq_status_common.sh -n ubdaq-prod-crt04 -p 5205
 echo "------------------------------------------------"
 
-echo "STATUS: EventBuilder:"
-./daq_status_common.sh -n ${HOST} -p 5235
+echo "STATUS: EventBuilder(s):"
+daq_status_common.sh -n ubdaq-prod-crtevb -p 5235
 echo "------------------------------------------------"
 echo STATUS COMPLETE
 
