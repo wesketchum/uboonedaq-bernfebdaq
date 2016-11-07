@@ -4,7 +4,7 @@ cet_script( SDAQ_Initialize.sh
 	    SDAQ_Shutdown.sh
 	    SDAQ_StartRun.sh
 	    SDAQ_Status.sh
-	    SDAQ_StopRuns.sh
+	    SDAQ_StopRun.sh
 	    SDAQ_Terminate.sh
 	    setup.sh
 	    daq_init_common.sh
