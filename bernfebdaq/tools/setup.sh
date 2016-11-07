@@ -7,4 +7,4 @@ source /artdaq_products/setup
 
 setup bernfebdaq v00_03_00 -qe10:eth:s41:prof
 
-export FHICL_FILE_PATH=/home/wketchum/uboonedaq-bernfebdaq/bernfebdaq/tools/fcl/:$FHICL_FILE_PATH
+#export FHICL_FILE_PATH=/home/wketchum/uboonedaq-bernfebdaq/bernfebdaq/tools/fcl/:$FHICL_FILE_PATH
