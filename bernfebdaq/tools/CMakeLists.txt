@@ -1,4 +1,16 @@
-#cet_script()
+cet_script( SDAQ_Initialize.sh
+	    SDAQ_Boot.sh
+	    SDAQ_ConfigProcesses.sh
+	    SDAQ_Shutdown.sh
+	    SDAQ_StartRun.sh
+	    SDAQ_Status.sh
+	    SDAQ_StopRuns.sh
+	    SDAQ_Terminate.sh
+	    setup.sh
+	    daq_init_common.sh
+	    daq_start_common.sh
+	    daq_status_common.sh
+	    daq_stop_common.sh )
 
 
 art_make_exec(test_driver
