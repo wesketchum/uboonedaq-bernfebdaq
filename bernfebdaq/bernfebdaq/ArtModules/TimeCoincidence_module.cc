@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 
 #include "TTree.h"
 
@@ -115,7 +116,7 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
 	  { max_adc_value=this_event->adc[i_chan]; max_adc_channel=i_chan; }
 
       std::cout << "\tEvent " << i_e << " was at time " << bfrag_metadata->time_start_seconds() << " s, "
-		<< corrected_time << " ns"
+		<< std::setprecision(10) << corrected_time << " ns"
 		<< ". Max adc value = " << max_adc_value << " on channel " << max_adc_channel
 		<< std::endl;
       
