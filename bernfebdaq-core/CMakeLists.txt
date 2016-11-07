@@ -39,7 +39,7 @@ cet_report_compiler_flags()
 find_ups_product( cetbuildtools v3_03_00 )
 find_ups_product( artdaq_core v1_00_00 )
 find_ups_product( art v1_06_00 )
-find_ups_product( cpp0x v1_03_00 )
+#find_ups_product( cpp0x v1_03_00 )
 find_ups_product( cetlib v1_03_00 )
 find_ups_boost( v1_50_0 filesystem
                         program_options

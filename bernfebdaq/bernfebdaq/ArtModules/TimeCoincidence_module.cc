@@ -10,7 +10,7 @@
 #include "art/Framework/Principal/Event.h"
 #include "art/Framework/Principal/Handle.h"
 
-#include "art/Utilities/Exception.h"
+//#include "art/Utilities/Exception.h"
 #include "bernfebdaq-core/Overlays/BernFEBFragment.hh"
 #include "artdaq-core/Data/Fragments.hh"
 

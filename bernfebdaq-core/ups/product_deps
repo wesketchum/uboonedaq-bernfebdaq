@@ -1,7 +1,7 @@
 # The parent line must be the first non-comment line in the file
 # This line defines the product name and version
 parent bernfebdaq_core		v0_02_00
-defaultqual	e10:s34
+defaultqual	e10:s41
 
 # These optional lines define the installed directories where
 # headers, libraries, and executables will be found
@@ -30,6 +30,8 @@ end_product_list
 qualifier		artdaq_core
 e10:s34:prof		e10:s34:prof
 e10:s34:debug		e10:s34:debug
+e10:s41:prof		e10:s41:prof
+e10:s41:debug		e10:s41:debug
 end_qualifier_list
 
 # Preserve tabs and formatting in emacs and vi / vim:

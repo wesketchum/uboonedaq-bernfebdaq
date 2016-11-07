@@ -1,6 +1,6 @@
 #include "bernfebdaq/Generators/BernZMQ_GeneratorBase.hh"
 
-#include "art/Utilities/Exception.h"
+//#include "art/Utilities/Exception.h"
 #include "cetlib/exception.h"
 #include "bernfebdaq-core/Overlays/FragmentType.hh"
 #include "fhiclcpp/ParameterSet.h"
