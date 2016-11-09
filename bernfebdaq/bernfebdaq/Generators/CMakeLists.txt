@@ -78,3 +78,6 @@ simple_plugin(BernZMQData "generator"
   ${MF_UTILITIES}
   ${CETLIB}
   )
+
+install_headers()
+install_source()
