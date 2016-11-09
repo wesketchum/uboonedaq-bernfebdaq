@@ -6,7 +6,7 @@ daq: {
 
     generator: BernZMQData
 
-    #board_id: 1
+    board_id: 1
 
     SubrunTimeWindowSize: 1e8    #in ns
     SequenceTimeWindowSize: 1e8  #in ns
