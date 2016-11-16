@@ -61,7 +61,7 @@ outputs: {
 
   directFile: {
     module_type: RootOutput
-    fileName: "uboone_bernfebdaq_%06r_%06s_%06S_%to_%tc.root"
+    fileName: "/raid/uboonedaq/data/uboone_bernfebdaq_%06r_%06s_%06S_%to_%tc.root"
     compressionLevel: 1
 
     fileProperties:{
