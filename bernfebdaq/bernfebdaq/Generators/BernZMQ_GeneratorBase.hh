@@ -75,7 +75,7 @@ namespace bernfebdaq {
     virtual void Cleanup();        //called in destructor
 
     typedef boost::circular_buffer<BernZMQEvent> EventBuffer_t;
-    typedef boost::circular_buffer<timeval>      EventTimeBuffer_t;
+    typedef boost::circular_buffer< std::pair<timeval,timeval> > EventTimeBuffer_t;
     typedef boost::circular_buffer<unsigned int> EventsDroppedBuffer_t;
     typedef boost::circular_buffer<uint64_t>     EventsCorrectedTimeBuffer_t;
     //typedef std::deque<BernZMQEvent> ZMQEventBuffer_t;
@@ -99,6 +99,7 @@ namespace bernfebdaq {
       uint32_t                     overwritten_counter;
       uint32_t                     max_time_diff;
       uint64_t                     id;
+      timeval                      last_timenow;
 
       FEBBuffer(uint32_t capacity, uint32_t td, uint64_t i)
 	: buffer(EventBuffer_t(capacity)),
@@ -117,6 +118,8 @@ namespace bernfebdaq {
 	correctedtimebuffer.clear();
 	mutexptr->unlock();
 	overwritten_counter = 0;
+	last_timenow.tv_sec = 0;
+	last_timenow.tv_usec = 0;
       }
     } FEBBuffer_t;
 

@@ -234,11 +234,19 @@ size_t bernfebdaq::BernZMQ_GeneratorBase::InsertIntoFEBBuffer(FEBBuffer_t & b,
   timenow.tv_sec = time_poll_finished.time;
   timenow.tv_usec = time_poll_finished.millitm*1000;
 
-  b.timebuffer.insert(b.timebuffer.end(),good_events,timenow);
+  if(b.last_timenow.tv_sec==0){
+    timeb time_poll_started = *((timeb*)((char*)(ZMQBufferUPtr[total_events-1].adc)+sizeof(int)));
+    b.last_timenow.tv_sec = time_poll_started.time;
+    b.last_timenow.tv_usec = time_poll_started.millitm*1000;
+  }
+
+  b.timebuffer.insert(b.timebuffer.end(),good_events,std::make_pair(b.last_timenow,timenow));
   b.droppedbuffer.insert(b.droppedbuffer.end(),good_events-1,0);
   b.droppedbuffer.insert(b.droppedbuffer.end(),1,nevents-good_events);
   b.buffer.insert(b.buffer.end(),&(ZMQBufferUPtr[begin_index]),&(ZMQBufferUPtr[good_events+begin_index]));
   
+  b.last_timenow = timenow;
+
   TRACE(TR_DEBUG,"After insert, here's contents of buffer:");
   TRACE(TR_DEBUG,"============================================");
   for(size_t i_e=0; i_e<b.buffer.size(); ++i_e)
@@ -376,26 +384,30 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
 
   //ok, so now, determine the nearest second for the last event (closest to one second), based on ntp time
   //get the usecs from the timeval
-  auto gps_timeval = feb.timebuffer.at(i_gps);
+  auto gps_timeval_pair = feb.timebuffer.at(i_gps);
   
-  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : GPS time was at %ld sec and %ld usec",
-	gps_timeval.tv_sec,gps_timeval.tv_usec);
+  TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : GPS time was between (%ld sec, %ld usec) and (%ld sec, %ld usec)",
+	gps_timeval_pair.first.tv_sec,gps_timeval_pair.first.tv_usec,
+	gps_timeval_pair.second.tv_sec,gps_timeval_pair.second.tv_usec);
 
   //report remainder as a metric to watch for
   std::string id_str = GetFEBIDString(feb_id);
-  metricMan_->sendMetric("BoundaryTimeRemainder_"+id_str,(float)(gps_timeval.tv_usec),"microseconds",false,"BernZMQGenerator");
+  //metricMan_->sendMetric("BoundaryTimeRemainder_"+id_str,(float)(gps_timeval.tv_usec),"microseconds",false,"BernZMQGenerator");
   
   //round the boundary time to the nearest second.
   //ROUND DOWN!!
   //if(gps_timeval.tv_usec > 5e5)
   //gps_timeval.tv_sec+=1;
-  gps_timeval.tv_usec = 0;
+  //gps_timeval.tv_usec = 0;
 
+  uint32_t first_time_sec = gps_timeval_pair.first.tv_sec;
 
+  if( (gps_timeval_pair.second.tv_sec-gps_timeval_pair.first.tv_sec)==(elapsed_secs-1) )
+    first_time_sec = first_time_sec -1;
 
-  uint32_t frag_begin_time_s = gps_timeval.tv_sec-elapsed_secs;
+  uint32_t frag_begin_time_s = first_time_sec;
   uint32_t frag_begin_time_ns = 0;
-  uint32_t frag_end_time_s = gps_timeval.tv_sec-elapsed_secs;
+  uint32_t frag_end_time_s = first_time_sec;
   uint32_t frag_end_time_ns = SequenceTimeWindowSize_;
   
   if(SeqIDMinimumSec_==0){
@@ -406,7 +418,7 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
   last_time=0;
   uint64_t time_offset=0;
   size_t i_b=0;
-  while(frag_end_time_s < gps_timeval.tv_sec){
+  while(frag_end_time_s < gps_timeval_pair.second.tv_sec){
 
     if(frag_end_time_ns>=1000000000){
       frag_end_time_ns = frag_end_time_ns%1000000000;
@@ -443,7 +455,7 @@ bool bernfebdaq::BernZMQ_GeneratorBase::FillFragment(uint64_t const& feb_id,
       TRACE(TR_FF_LOG,"BernZMQ::FillFragment() : event %lu, time=%u, corrected_time=%lf",
 	    i_e,this_event.Time_TS0(),(double)this_corrected_time*time_corr_factor);
       
-      if( (double)this_corrected_time*time_corr_factor > (frag_end_time_s-(gps_timeval.tv_sec-elapsed_secs))*1e9+frag_end_time_ns )
+      if( (double)this_corrected_time*time_corr_factor > (frag_end_time_s-first_time_sec)*1e9+frag_end_time_ns )
 	break;
 
 
