@@ -1,0 +1,72 @@
+daq: {
+
+  max_fragment_size_words: 3000000
+
+  fragment_receiver: {
+
+    generator: BernZMQData
+
+    board_id: 3
+
+    SubrunTimeWindowSize: 1e8    #in ns
+    SequenceTimeWindowSize: 1e8  #in ns
+
+    nADCBits: 12
+    nChannels: 32
+    ReaderID: 0x4
+   
+    FEBIDs : [ 0x603712340b, 
+    	       0x603712340c, 
+	       0x603712340e, 
+	       0x6037123411, 
+	       0x6037123412, 
+	       0x6037123413,
+               0x6037123416, 
+	       0x6037123417, 
+	       0x6037123418 ] 
+  
+    MaxTimeDiffs : [ 1e8 ]
+    MaxDTPSleep: 1e8
+
+    FEBDequeBufferCapacity: 10e3
+    FEBDTPBufferCapacity: 1024
+
+    zmq_data_pub_port: "tcp://localhost:5556"
+    zmq_data_receive_timeout_ms: 500
+   
+    mpi_buffer_count: 1
+    mpi_sync_interval: 0
+    first_event_builder_rank: 3
+    #first_event_builder_rank: 1
+    event_builder_count: 1
+  
+
+    fragment_ids: []
+    fragment_id: -99
+
+    sleep_on_stop_us: 0
+
+    triggers_enabled: false
+
+    data_buffer_depth_fragments: 1000
+    data_buffer_depth_mb: 1000
+
+    separate_data_thread: false
+    separate_monitoring_thread: false
+    poll_hardware_status: false
+
+    metrics: {
+
+      #graphite:{
+        #level: 5
+        #metricPluginType: "graphite"
+        #host: "ubdaq-prod-crtevb"
+        #port: 8080
+        #namespace: "artdaq."
+      #}
+
+    }#end metrics
+
+  }#end fragment_receiver
+
+}#end daq

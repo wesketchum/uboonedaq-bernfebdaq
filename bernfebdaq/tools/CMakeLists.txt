@@ -1,14 +1,16 @@
-cet_script(setupDemoEnvironment.sh DemoControl.rb 
-startSystem.sh manageSystem.sh
-start2x2System.sh manage2x2System.sh 
-start2x2x2System.sh manage2x2x2System.sh
-CreateNewFragmentGenerator.rb  generateEventBuilderMain.rb
-generateWFViewer.rb generateEventBuilder.rb demo_utilities.rb 
-generateToy.rb generateUDP.rb
-generatePattern.rb generateNormal.rb generateAscii.rb generateAggregator.rb 
-generateAggregatorMain.rb generateV1720.rb generateCompression.rb generateBoardReaderMain.rb RunDriver.rb
-makeConfigs.rb
-multi_udp_send_artdaq.py)
+cet_script( SDAQ_Initialize.sh
+	    SDAQ_Boot.sh
+	    SDAQ_ConfigProcesses.sh
+	    SDAQ_Shutdown.sh
+	    SDAQ_StartRun.sh
+	    SDAQ_Status.sh
+	    SDAQ_StopRun.sh
+	    SDAQ_Terminate.sh
+	    setup.sh
+	    daq_init_common.sh
+	    daq_start_common.sh
+	    daq_status_common.sh
+	    daq_stop_common.sh )
 
 
 art_make_exec(test_driver
@@ -38,3 +40,4 @@ add_subdirectory(snippets)
 
 # Is this necessary?
 #install_source()
+add_subdirectory(fcl)

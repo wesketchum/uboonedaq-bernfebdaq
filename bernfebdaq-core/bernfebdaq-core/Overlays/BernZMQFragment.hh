@@ -1,5 +1,5 @@
-#ifndef bernfebdaq_Overlays_BernFEBFragment_hh
-#define bernfebdaq_Overlays_BernFEBFragment_hh
+#ifndef bernfebdaq_Overlays_BernZMQFragment_hh
+#define bernfebdaq_Overlays_BernZMQFragment_hh
 
 #include "artdaq-core/Data/Fragment.hh"
 #include "cetlib/exception.h"
@@ -9,35 +9,36 @@
 #include <string>
 #include <vector>
 
-// Implementation of "BernFEBFragment", an artdaq::Fragment overlay class
+//#include "bernfebdrv/febevt.h"
+
+// Implementation of "BernZMQFragment", an artdaq::Fragment overlay class
 
 namespace bernfebdaq {
 
-  struct BernFEBTimeStamp;
-  std::ostream & operator << (std::ostream &, BernFEBTimeStamp const &);
+  struct BernZMQEvent;
+  std::ostream & operator << (std::ostream &, BernZMQEvent const &);
 
-  struct BernFEBEvent;
-  std::ostream & operator << (std::ostream &, BernFEBEvent const &);
+  class BernZMQFragment;
+  std::ostream & operator << (std::ostream &, BernZMQFragment const &);
 
-  class BernFEBFragment;
-  std::ostream & operator << (std::ostream &, BernFEBFragment const &);
+  class BernZMQFragmentMetadata;
+  std::ostream & operator << (std::ostream &, BernZMQFragmentMetadata const&);
 
-  class BernFEBFragmentMetadata;
-  std::ostream & operator << (std::ostream &, BernFEBFragmentMetadata const&);
+  typedef std::vector<BernZMQEvent> BernZMQEvents;
+  typedef std::pair<BernZMQFragmentMetadata,BernZMQEvents> BernZMQDataPair;
 
-  typedef std::vector<BernFEBEvent> BernFEBEvents;
-  typedef std::pair<BernFEBFragmentMetadata,BernFEBEvents> BernFEBDataPair;
+  double GetCorrectedTime(uint32_t const&, BernZMQFragmentMetadata const&);
 }
 
-class bernfebdaq::BernFEBFragmentMetadata {
+class bernfebdaq::BernZMQFragmentMetadata {
 
 public:
 
-  BernFEBFragmentMetadata(){}
+  BernZMQFragmentMetadata(){}
 
-  BernFEBFragmentMetadata(uint32_t ts_s, uint32_t ts_ns, 
+  BernZMQFragmentMetadata(uint32_t ts_s, uint32_t ts_ns, 
 			  uint32_t te_s, uint32_t te_ns,
-			  double f, uint64_t t_o,
+			  int t_c, uint64_t t_o,
 			  uint32_t r, uint32_t seq,
 			  uint64_t fid, uint32_t rid,
 			  uint32_t nch, uint32_t nadc)
@@ -46,7 +47,7 @@ public:
     _time_start_nanosec(ts_ns),
     _time_end_seconds(te_s),
     _time_end_nanosec(te_ns),
-    _time_correction_factor(f),
+    _time_correction_diff(t_c),
     _time_offset(t_o),
     _run_number(r),
     _sequence_number(seq),
@@ -67,7 +68,7 @@ public:
   uint32_t const& time_end_seconds() const { return _time_end_seconds; }
   uint32_t const& time_end_nanosec() const { return _time_end_nanosec; }
 
-  double   const& time_correction_factor() const { return _time_correction_factor; }
+  int      const& time_correction_diff() const { return _time_correction_diff; }
   uint64_t const& time_offset() const { return _time_offset; }
 
   uint32_t const& run_number()         const { return _run_number; }
@@ -100,7 +101,7 @@ private:
   uint32_t _time_end_seconds; //time at fragment end, seconds
   uint32_t _time_end_nanosec; //time at fragment end, nanoseconds
 
-  double _time_correction_factor;
+  int _time_correction_diff;
   uint64_t _time_offset;
 
   uint32_t _run_number;
@@ -122,64 +123,49 @@ private:
   
 };
 
-struct bernfebdaq::BernFEBTimeStamp{
+struct bernfebdaq::BernZMQEvent{    
 
-  union{
-    struct{
-      uint32_t rawtime : 30;
-      uint32_t overflow : 1;
-      uint32_t reference : 1;
-    } ts;
-    uint32_t rawts;
-  } __attribute__ ((packed));
-
-  uint32_t Time() const{
-    uint32_t temp = (ts.rawtime>>2); //ignore last two bits for now;
-    for(int i=4; i>=0; --i)
-      temp = temp ^ (temp >> (1<<i));
-    return ( (temp << 2) | (ts.rawtime&0x3) );
-  }
-  bool IsOverflow() const{
-    return (ts.overflow==1);
-  }
-  bool IsReference() const{
-    return (ts.reference==1);
-  }
-
-  const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
-};
-
-struct bernfebdaq::BernFEBEvent{    
-
-  union{
-    struct{
-      uint32_t overwritten : 16;
-      uint32_t missed      : 16;
-    } flags;
-    uint32_t flags_word;
-  } __attribute__ ((packed));
-
-  BernFEBTimeStamp time1;
-  BernFEBTimeStamp time2;
+  //typedef struct {
+  uint16_t mac5;
+  uint16_t flags;
+  uint16_t lostcpu;
+  uint16_t lostfpga;
+  uint32_t ts0;
+  uint32_t ts1;
   uint16_t adc[32];
+  //} EVENT_t; 
+  //
+  //EVENT_t event_data;
+
+  uint16_t const& MAC5() const { return mac5; }
+
+  bool     IsOverflow_TS0()  const { return (flags&0x1)==0; }
+  bool     IsOverflow_TS1()  const { return (flags&0x2)==0; }
+  bool     IsReference_TS0() const { return (flags&0x4)!=0; }
+  bool     IsReference_TS1() const { return (flags&0x8)!=0; }
+
+  uint32_t const& Time_TS0() const { return ts0; }
+  uint32_t const& Time_TS1() const { return ts1; }
+
+  uint16_t const* ADC()         const { return adc; }
+  uint16_t const& ADC(size_t c) const { return adc[c]; }
 
   const char* c_str() const { std::ostringstream ss; ss << *this; return ss.str().c_str(); }
-  std::string db_entry() const;
-
+  //std::string db_entry() const;
 };
 
-class bernfebdaq::BernFEBFragment {
+class bernfebdaq::BernZMQFragment {
   public:
 
-  BernFEBFragment(artdaq::Fragment const & f) : artdaq_Fragment_(f) {}
+  BernZMQFragment(artdaq::Fragment const & f) : artdaq_Fragment_(f) {}
 
-  BernFEBFragmentMetadata const * metadata() const { return artdaq_Fragment_.metadata<BernFEBFragmentMetadata>(); }
+  BernZMQFragmentMetadata const * metadata() const { return artdaq_Fragment_.metadata<BernZMQFragmentMetadata>(); }
 
-  BernFEBEvent const* eventdata(uint16_t e) const {
+  BernZMQEvent const* eventdata(uint16_t e) const {
     if(e > metadata()->n_events())
-      throw cet::exception("BernFEBFragment::BernFEBEvent")
+      throw cet::exception("BernZMQFragment::BernZMQEvent")
 	<< "Event requested (" << (uint32_t)e << ") is out of range: " << metadata()->n_events();
-    return ( reinterpret_cast<BernFEBEvent const*>(artdaq_Fragment_.dataBeginBytes() + e*sizeof(BernFEBEvent)) );
+    return ( reinterpret_cast<BernZMQEvent const*>(artdaq_Fragment_.dataBeginBytes() + e*sizeof(BernZMQEvent)) );
   }
 
   size_t DataPayloadSize() const { return artdaq_Fragment_.dataSizeBytes(); }
@@ -193,5 +179,10 @@ private:
   artdaq::Fragment const & artdaq_Fragment_;
 
 };
+
+double bernfebdaq::GetCorrectedTime( uint32_t const& t, BernZMQFragmentMetadata const& m)
+{
+  return (double)(t+m.time_offset()) * (1.0 - ((double)(m.time_correction_diff())/1.0e9));
+}
 
 #endif /* artdaq_demo_Overlays_ToyFragment_hh */

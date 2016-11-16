@@ -2,12 +2,4 @@
 *~
 *.[0-9]
 
-tools/fcl/ToySimulator.fcl
-tools/fcl/V172xSimulator.fcl
-tools/fcl/WFViewer.fcl
-
-Aggregator_*.fcl
-BoardReader_*.fcl
-EventBuilder_*.fcl
-
 NONE

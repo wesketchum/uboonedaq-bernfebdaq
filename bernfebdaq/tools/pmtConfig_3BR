@@ -1,0 +1,4 @@
+BoardReaderMain ubdaq-prod-crt02-priv 5205
+BoardReaderMain ubdaq-prod-crt03-priv 5205
+BoardReaderMain ubdaq-prod-crt04-priv 5205
+EventBuilderMain ubdaq-prod-crtevb-priv 5235

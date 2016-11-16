@@ -2,16 +2,18 @@
 typedef struct {
 		uint16_t mac5;
 		uint16_t flags;
+		uint16_t lostcpu;
+		uint16_t lostfpga;
 		uint32_t ts0;
 		uint32_t ts1;
 		uint16_t adc[32];
 } EVENT_t; 
 
-#define EVLEN 76
+#define EVLEN 80
 #define MAGICWORD8 0xa5 //marker for the buffer start in the file 
 #define MAGICWORD16 0xaa55 //marker for the buffer start in the file 
-//#define MAGICWORD32 0xaa55aa55 //marker for the buffer start in the file 
-#define MAGICWORD32 0x01020255 //marker for the buffer start in the file 
+#define MAGICWORD32 0xaa55aa55 //marker for the buffer start in the file 
+//#define MAGICWORD32 0x01020255 //marker for the buffer start in the file 
 
 typedef struct {
 		int status;		

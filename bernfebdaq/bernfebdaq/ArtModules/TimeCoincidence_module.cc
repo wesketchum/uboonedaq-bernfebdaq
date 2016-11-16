@@ -10,8 +10,8 @@
 #include "art/Framework/Principal/Event.h"
 #include "art/Framework/Principal/Handle.h"
 
-#include "art/Utilities/Exception.h"
-#include "bernfebdaq-core/Overlays/BernFEBFragment.hh"
+//#include "art/Utilities/Exception.h"
+#include "bernfebdaq-core/Overlays/BernZMQFragment.hh"
 #include "artdaq-core/Data/Fragments.hh"
 
 #include "art/Framework/Services/Optional/TFileService.h"
@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <vector>
 #include <iostream>
+#include <iomanip>
 
 #include "TTree.h"
 
@@ -68,7 +69,7 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
   
   // look for raw BernFEB data  
   art::Handle< std::vector<artdaq::Fragment> > rawHandle;
-  evt.getByLabel(raw_data_label_, "BernFEB", rawHandle);
+  evt.getByLabel(raw_data_label_, "BernZMQ", rawHandle);
 
   //check to make sure the data we asked for is valid
   if(!rawHandle.isValid()){
@@ -87,7 +88,7 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
   for(auto const& frag : rawFragments){
 
     //overlay this so it's in the "BernFragment" format. Same data!
-    BernFEBFragment bfrag(frag);
+    BernZMQFragment bfrag(frag);
 
     //Grab the metadata.
     //See bernfebdaq-core/bernfebdaq-core/Overlays/BernFEBFragment.hh
@@ -102,9 +103,11 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
     //	      << " from time range [" << time_begin << "," << time_end << ")" << std::endl;
 
     for(size_t i_e=0; i_e<nevents; ++i_e){
-      BernFEBEvent const* this_event = bfrag.eventdata(i_e); //get the single hit/event
+      BernZMQEvent const* this_event = bfrag.eventdata(i_e); //get the single hit/event
       
-      BernFEBTimeStamp gps_time = this_event->time1;         //grab the event time
+      auto time_ts0 = this_event->Time_TS0();         //grab the event time
+
+      double corrected_time = GetCorrectedTime(time_ts0,*bfrag_metadata);
 
       //let's get channel and value for max adc count
       uint16_t max_adc_value=0; int max_adc_channel=0;
@@ -112,7 +115,8 @@ void bernfebdaq::TimeCoincidence::analyze(art::Event const & evt)
 	if(this_event->adc[i_chan]>max_adc_value) //grab the adc value in each channel
 	  { max_adc_value=this_event->adc[i_chan]; max_adc_channel=i_chan; }
 
-      std::cout << "\tEvent " << i_e << " was at time " << gps_time.Time() 
+      std::cout << "\tEvent " << i_e << " was at time " << bfrag_metadata->time_start_seconds() << " s, "
+		<< std::setprecision(10) << corrected_time << " ns"
 		<< ". Max adc value = " << max_adc_value << " on channel " << max_adc_channel
 		<< std::endl;
       

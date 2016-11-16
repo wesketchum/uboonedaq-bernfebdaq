@@ -1,6 +1,6 @@
 #include "bernfebdaq/Generators/BernFEB_GeneratorBase.hh"
 
-#include "art/Utilities/Exception.h"
+//#include "art/Utilities/Exception.h"
 #include "cetlib/exception.h"
 #include "bernfebdaq-core/Overlays/FragmentType.hh"
 #include "fhiclcpp/ParameterSet.h"
@@ -29,28 +29,21 @@ bernfebdaq::BernFEB_GeneratorBase::BernFEB_GeneratorBase(fhicl::ParameterSet con
   TRACE(TR_LOG,"BernFeb constructor completed");  
 }
 
-uint32_t BinaryToGrayTemp(uint32_t bin_time){
-  
-  uint32_t gray_time(bin_time&0x7); 
-  for(size_t i_b=3; i_b<32; ++i_b){
-    gray_time += (((bin_time & (1<<i_b))>>i_b)^((bin_time & (1<<(i_b-1)))>>(i_b-1))) << i_b;
-  }
-  
-  return gray_time;
-  
-}
-
 void bernfebdaq::BernFEB_GeneratorBase::Initialize(){
   
   TRACE(TR_LOG,"BernFeb::Initialze() called");
 
   RunNumber_ = ps_.get<uint32_t>("RunNumber",999);
   SubrunTimeWindowSize_ = ps_.get<uint64_t>("SubRunTimeWindowSize",60e9); //one minute
-  SequenceTimeWindowSize_ = ps_.get<uint32_t>("SequenceTimeWindowSize",1e6); //one ms
+  SequenceTimeWindowSize_ = ps_.get<uint32_t>("SequenceTimeWindowSize",5e6); //5 ms
   nADCBits_  = ps_.get<uint8_t>("nADCBits",12);
   nChannels_ = ps_.get<uint32_t>("nChannels",32);
   ReaderID_ = ps_.get<uint8_t>("ReaderID",0x1);
   FEBIDs_ = ps_.get< std::vector<uint64_t> >("FEBIDs");
+
+  if(SequenceTimeWindowSize_<1e6)
+    throw cet::exception("BernFEB_GeneratorBase::Initialize")
+      << "Sequence Time Window size is less than 1 ms (1e6 ns). This is not supported.";
 
   FEBBufferCapacity_ = ps_.get<uint32_t>("FEBBufferCapacity",5e3);
   FEBBufferSizeBytes_ = FEBBufferCapacity_*sizeof(BernFEBEvent);
@@ -262,6 +255,7 @@ size_t bernfebdaq::BernFEB_GeneratorBase::EraseFromFEBBuffer(FEBBuffer_t & b,
   std::unique_lock<std::mutex> lock(*(b.mutexptr));
   b.droppedbuffer.erase_begin(nevents);
   b.timebuffer.erase_begin(nevents);
+  b.correctedtimebuffer.erase_begin(nevents);
   b.buffer.erase_begin(nevents);
   return b.buffer.size();
 }
@@ -321,142 +315,144 @@ bool bernfebdaq::BernFEB_GeneratorBase::FillFragment(uint64_t const& feb_id,
     return false;
   }
 
-  TRACE(TR_FF_DEBUG,
-	"\tBernFeb::FillFragment() : Look for data, id=0x%lx, time=[%ld,%ld]. Buffer size=%lu",
-	feb_id,feb.next_time_start,feb.next_time_start+SequenceTimeWindowSize_,feb.buffer.size());
-				   
-  int64_t time = 0;
-  size_t  local_time_resets = 0;
-
-  int32_t local_last_time = feb.last_time_counter;
-
-  bool found_fragment=false;
-
   size_t buffer_end = feb.buffer.size();
-  int n_TimeErrors_detected = 0;
 
-  timeval starttime = feb.timebuffer.at(0);
-  timeval endtime   = feb.timebuffer.at(buffer_end-1);
-  
   TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment Searching. Total events in buffer=%lu.",
 	buffer_end);
 
+  double time_correction = -1.0;
 
-  //just find the time boundary first
-  for(size_t i_e=1; i_e<buffer_end-1; ++i_e){
-    
+  //find GPS pulse and count wraparounds
+  size_t i_gps=buffer_end;
+  size_t n_wraparounds=0;
+  uint32_t last_time =0;
+  size_t i_e;
+  for(i_e=0; i_e<buffer_end; ++i_e){
+
     auto const& this_event = feb.buffer[i_e];
-    TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() ... found event: %s",this_event.c_str());
     
-    if((int64_t)this_event.time1.Time() <= local_last_time)
-      ++local_time_resets;
-    
-    local_last_time = this_event.time1.Time();
-    
-    time = this_event.time1.Time()+(feb.time_resets+local_time_resets)*1e9;
 
-    TRACE(TR_FF_DEBUG,
-	  "\n\tBernFEb::FillFragment() ... ev_time is %u, resets=%lu, local_resets=%lu, time=%ld",
-	  this_event.time1.Time(),feb.time_resets,local_time_resets,time);
-
-    if(time<feb.next_time_start)
-      TRACE(TR_WARNING,"BernFeb::FillFragment() WARNING! Time out of place! %ld vs %ld",time,feb.next_time_start);
-    else if(time>feb.next_time_start+SequenceTimeWindowSize_){
-      TRACE(TR_FF_DEBUG,
-	    "\n\tBernFeb::FillFragment() : Found a new time!! %ld (>%ld)",
-	    time,feb.next_time_start+SequenceTimeWindowSize_);
-      buffer_end = i_e;
-      found_fragment = true;
-      starttime = feb.timebuffer[0];
-      endtime = feb.timebuffer[i_e];
-      break;
+    if(this_event.time1.IsReference()){
+      i_gps=i_e;
     }
+    else if(this_event.time1.Time()<last_time && this_event.time1.IsOverflow())
+      n_wraparounds++;
+
+    feb.correctedtimebuffer[i_e] = (this_event.time1.Time()+(uint64_t)n_wraparounds*0x40000000);
+    last_time = this_event.time1.Time();
+
+    if(i_gps!=buffer_end) break;
   }
 
-  //didn't get our last event in this time window ... return
-  if(!clear_buffer && !found_fragment){
-    TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer not empty, but waiting for more data.");
+  if(i_gps==buffer_end){
+    TRACE(TR_FF_LOG,"BernFeb::FillFragment() completed, buffer not empty, but waiting for GPS pulse.");
     return false;
   }
+  
+  
+  //determine how much time passed. should be close to corrected time.
+  //then determine the correction.
+  uint32_t elapsed_secs = (feb.correctedtimebuffer[i_gps]/1e9);
+  if(feb.correctedtimebuffer[i_gps]%1000000000 > 500000000)
+    elapsed_secs+=1;
+  time_correction = 1.0e9*(double)elapsed_secs / (double)(feb.correctedtimebuffer[i_gps]);
+  
+  
+  //ok, so now, determine the nearest second for the last event (closest to one second), based on ntp time
+  //get the usecs from the timeval
+  auto gps_timeval = feb.timebuffer.at(i_gps);
+  
+  //report remainder as a metric to watch for
+  std::string id_str = GetFEBIDString(feb_id);
+  metricMan_->sendMetric("BoundaryTimeRemainder_"+id_str,(float)(gps_timeval.tv_usec),"microseconds",false,"BernFEBGenerator");
+  
+  //round the boundary time to the nearest second.
+  if(gps_timeval.tv_usec > 5e5)
+    gps_timeval.tv_sec+=1;
+  gps_timeval.tv_usec = 0;
 
-  TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Data window completed, [%u,%u), events=%lu",
-	feb.buffer[0].time1.Time(),feb.buffer[buffer_end].time1.Time(),buffer_end);
 
+  uint32_t frag_begin_time_s = gps_timeval.tv_sec-elapsed_secs;
+  uint32_t frag_begin_time_ns = 0;
+  uint32_t frag_end_time_s = gps_timeval.tv_sec-elapsed_secs;
+  uint32_t frag_end_time_ns = SequenceTimeWindowSize_;
+  
+  i_e=0;
+  last_time=0;
+  uint64_t time_offset=0;
+  while(frag_end_time_s < gps_timeval.tv_sec){
 
-  //ok, queue was non-empty, and we saw our last event. Need to loop through and do proper accounting now.
-
-  //make metadata object
-  BernFEBFragmentMetadata metadata((feb.next_time_start/1000000000),
-				   feb.next_time_start % 1000000000,
-				   (uint32_t)(starttime.tv_sec),
-				   1e3*starttime.tv_usec,
-				   (feb.next_time_start+SequenceTimeWindowSize_)/1000000000,
-				   (feb.next_time_start+SequenceTimeWindowSize_) % 1000000000,				   
-				   (uint32_t)(endtime.tv_sec),
-				   1e3*endtime.tv_usec,
-				   RunNumber_,
-				   feb.next_time_start/SubrunTimeWindowSize_,
-				   feb.next_time_start/SequenceTimeWindowSize_ + 1,
-				   feb_id, ReaderID_,
-				   nChannels_,nADCBits_);
-
-  local_time_resets = 0;
-  local_last_time = feb.last_time_counter;
-  for(size_t i_e=0; i_e<buffer_end; ++i_e){
-    
-    auto const& this_event = feb.buffer[i_e];
-    
-    if((int32_t)this_event.time1.Time() <= feb.last_time_counter){
-      ++feb.time_resets;
-      TRACE(TR_FF_DEBUG,"\n\tBernFeb::FillFragment() : Time reset (evtime=%u,last_time=%d). Total resets=%lu",
-	    this_event.time1.Time(),feb.last_time_counter,feb.time_resets);
+    if(frag_end_time_ns>=1000000000){
+      frag_end_time_ns = frag_end_time_ns%1000000000;
+      frag_end_time_s+=1;
     }
-    feb.last_time_counter = this_event.time1.Time();
+
+    if(frag_begin_time_ns>=1000000000){
+      frag_begin_time_ns = frag_begin_time_ns%1000000000;
+      frag_begin_time_s+=1;
+    }
+
+    //make metadata object
+    BernFEBFragmentMetadata metadata(frag_begin_time_s,frag_begin_time_ns,
+				     frag_end_time_s,frag_end_time_ns,
+				     time_correction,time_offset,
+				     RunNumber_,
+				     (frag_begin_time_s*1000)+(frag_begin_time_ns/1000000), //sequence id is ms since epoch
+				     feb_id, ReaderID_,
+				     nChannels_,nADCBits_);
     
-    if(this_event.flags.overwritten > feb.overwritten_counter)
-      metadata.increment(this_event.flags.missed,this_event.flags.overwritten-feb.overwritten_counter,feb.droppedbuffer[i_e]);
-    else
-      metadata.increment(this_event.flags.missed,0,feb.droppedbuffer[i_e]);
-    feb.overwritten_counter = this_event.flags.overwritten;
+    while(i_e<i_gps+1){
+      
+      auto const& this_corrected_time = feb.correctedtimebuffer[i_e];
+      
+      if( (double)this_corrected_time*time_correction > frag_end_time_s*1e9+frag_end_time_ns )
+	break;
 
+      auto const& this_event = feb.buffer[i_e];
+
+      if(this_event.time1.Time()<last_time)
+	time_offset += 0x40000000;
+
+      if(this_event.flags.overwritten > feb.overwritten_counter)
+	metadata.increment(this_event.flags.missed,this_event.flags.overwritten-feb.overwritten_counter,feb.droppedbuffer[i_e]);
+      else
+	metadata.increment(this_event.flags.missed,0,feb.droppedbuffer[i_e]);
+      feb.overwritten_counter = this_event.flags.overwritten;
+    
+      ++i_e;
+    }
+    
+    //great, now add the fragment on the end.`<
+    frags.emplace_back( artdaq::Fragment::FragmentBytes(metadata.n_events()*sizeof(BernFEBEvent),  
+							metadata.sequence_number(),feb_id,
+							bernfebdaq::detail::FragmentType::BernFEB, metadata) );
+    std::copy(feb.buffer.begin(),feb.buffer.begin()+buffer_end,(BernFEBEvent*)(frags.back()->dataBegin()));
+    
+    TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Fragment created. First event in fragment: %s",
+	  ((BernFEBEvent*)(frags.back()->dataBegin()))->c_str() );
+    
+    TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment created. Events=%u. Metadata : %s",
+	  metadata.n_events(),metadata.c_str());
+        
+    SendMetadataMetrics(metadata);
   }
-  feb.next_time_start = feb.next_time_start+SequenceTimeWindowSize_;
-
-  TRACE(TR_FF_DEBUG,
-	"BernFeb::FillFragment() : Fragment prepared. Metadata:%s",
-	metadata.c_str());
-
-  //great, now add the fragment on the end.`<
-  frags.emplace_back( artdaq::Fragment::FragmentBytes(metadata.n_events()*sizeof(BernFEBEvent),  
-						      metadata.sequence_number(),feb_id,
-						      bernfebdaq::detail::FragmentType::BernFEB, metadata) );
-  std::copy(feb.buffer.begin(),feb.buffer.begin()+buffer_end,(BernFEBEvent*)(frags.back()->dataBegin()));
-
-  TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Fragment created. First event in fragment: %s",
-	((BernFEBEvent*)(frags.back()->dataBegin()))->c_str() );
-
-  TRACE(TR_FF_LOG,"BernFeb::FillFragment() : Fragment created. Events=%lu. Metadata : %s",
-	buffer_end,metadata.c_str());
 
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size before erase = %lu",feb.buffer.size());
-  size_t new_buffer_size = EraseFromFEBBuffer(feb,buffer_end);
+  size_t new_buffer_size = EraseFromFEBBuffer(feb,i_gps+1);
   TRACE(TR_FF_DEBUG,"BernFeb::FillFragment() : Buffer size after erase = %lu",feb.buffer.size());
 
-  auto id_str = GetFEBIDString(feb_id);
   metricMan_->sendMetric("FragmentsBuilt_"+id_str,1.0,"events",5,true,"BernFEBGenerator");
-  metricMan_->sendMetric("TimeErrorDetected_"+id_str,n_TimeErrors_detected,"events",5,true,"BernFEBGenerator");
   UpdateBufferOccupancyMetrics(feb_id,new_buffer_size);
-  SendMetadataMetrics(metadata);
 
   return true;
 }
 
 void bernfebdaq::BernFEB_GeneratorBase::SendMetadataMetrics(BernFEBFragmentMetadata const& m) {
   std::string id_str = GetFEBIDString(m.feb_id());
-  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end_seconds_raw()+m.time_end_nanosec_raw()),"ns",5,false,"BernFEBGenerator");
+  metricMan_->sendMetric("FragmentLastTime_"+id_str,(uint64_t)(m.time_end_seconds()*1000000000+m.time_end_nanosec()),"ns",5,false,"BernFEBGenerator");
   metricMan_->sendMetric("EventsInFragment_"+id_str,(float)(m.n_events()),"events",5,true,"BernFEBGenerator");
-  metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5,"BernFEBGenerator");
-  metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5,"BernFEBGenerator");
+  metricMan_->sendMetric("MissedEvents_"+id_str,     (float)(m.missed_events()),     "events",5,true,"BernFEBGenerator");
+  metricMan_->sendMetric("OverwrittenEvents_"+id_str,(float)(m.overwritten_events()),"events",5,true,"BernFEBGenerator");
   float eff=1.0;
   if((m.n_events()+m.missed_events()+m.overwritten_events())!=0)
     eff = (float)(m.n_events()) / (float)(m.n_events()+m.missed_events()+m.overwritten_events());

@@ -1,5 +1,0 @@
-
-// Port and Address of UDP data source
-port: %{port}
-ip: "%{address}"
-

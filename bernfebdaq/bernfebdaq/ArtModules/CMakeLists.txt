@@ -11,6 +11,9 @@
 simple_plugin(BernFEBDump "module"
               bernfebdaq-core_Overlays)
 
+simple_plugin(BernZMQDump "module"
+              bernfebdaq-core_Overlays)
+
 simple_plugin(TimeCoincidence "module"
               bernfebdaq-core_Overlays
 	      art_Framework_Services_Optional
@@ -20,3 +23,6 @@ simple_plugin(TimeCoincidence "module"
 
 # Subdirectories.
 #add_subdirectory(DQM)
+
+install_headers()
+install_source()

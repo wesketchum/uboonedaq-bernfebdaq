@@ -7,7 +7,7 @@
 
 namespace {
   static std::vector<std::string> const
-  names { "MISSED", "BernFEB","UNKNOWN" };
+  names { "MISSED", "BernFEB","BernZMQ","UNKNOWN" };
 }
 
 bernfebdaq::FragmentType

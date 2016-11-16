@@ -2,7 +2,7 @@
 #include "artdaq-core/Data/Fragments.hh" 
 #include "artdaq/Application/CommandableFragmentGenerator.hh"
 
-#include "bernfebdaq-core/Overlays/BernFEBFragment.hh"
+#include "bernfebdaq-core/Overlays/BernZMQFragment.hh"
 #include "bernfebdaq-core/Overlays/FragmentType.hh"
 
 #include <unistd.h>
@@ -20,10 +20,10 @@
 
 namespace bernfebdaq {    
 
-  class BernFEB_GeneratorBase : public artdaq::CommandableFragmentGenerator{
+  class BernZMQ_GeneratorBase : public artdaq::CommandableFragmentGenerator{
   public:
-    explicit BernFEB_GeneratorBase(fhicl::ParameterSet const & ps);
-    virtual ~BernFEB_GeneratorBase();
+    explicit BernZMQ_GeneratorBase(fhicl::ParameterSet const & ps);
+    virtual ~BernZMQ_GeneratorBase();
 
     //private:
   protected:
@@ -44,9 +44,7 @@ namespace bernfebdaq {
     std::vector<uint64_t> FEBIDs_;
     size_t nFEBs() { return FEBIDs_.size(); }
 
-    std::vector<size_t>   TargetDTPSizes_;
     std::vector<uint32_t> MaxTimeDiffs_;
-    unsigned int MaxDTPSleep_;           //nanoseconds
 
     std::size_t throttle_usecs_;        // Sleep at start of each call to getNext_(), in us
     std::size_t throttle_usecs_check_;  // Period between checks for stop/pause during the sleep (must be less than, and an integer divisor of, throttle_usecs_)
@@ -60,7 +58,7 @@ namespace bernfebdaq {
     virtual void ConfigureStop() = 0;  //called in stop()
 
     //gets the data. Output is size of data filled. Input is FEM ID.
-    virtual size_t GetFEBData(uint64_t const&) = 0;
+    virtual size_t GetZMQData() = 0;
     virtual int    GetDataSetup() { return 1; }
     virtual int    GetDataComplete() { return 1; }
 
@@ -69,91 +67,59 @@ namespace bernfebdaq {
 
   protected:
 
-    BernFEBFragmentMetadata metadata_;
+    BernZMQFragmentMetadata metadata_;
     fhicl::ParameterSet const ps_;
 
     //These functions could be overwritten by the derived class
     virtual void Initialize();     //called in constructor
     virtual void Cleanup();        //called in destructor
 
-    std::unique_ptr<BernFEBEvent[]> FEBDTPBufferUPtr;
-    uint32_t FEBDTPBufferCapacity_;
-    uint32_t FEBDTPBufferSizeBytes_;
-
-    typedef boost::circular_buffer<BernFEBEvent> FEBEventBuffer_t;
-    typedef boost::circular_buffer<timeval>      FEBEventTimeBuffer_t;
-    typedef boost::circular_buffer<unsigned int> FEBEventsDroppedBuffer_t;
-    typedef boost::circular_buffer<uint64_t>     FEBEventsCorrectedTimeBuffer_t;
-    //typedef std::deque<BernFEBEvent> FEBEventBuffer_t;
+    typedef boost::circular_buffer<BernZMQEvent> EventBuffer_t;
+    typedef boost::circular_buffer< std::pair<timeval,timeval> > EventTimeBuffer_t;
+    typedef boost::circular_buffer<unsigned int> EventsDroppedBuffer_t;
+    typedef boost::circular_buffer<uint64_t>     EventsCorrectedTimeBuffer_t;
+    //typedef std::deque<BernZMQEvent> ZMQEventBuffer_t;
 
     typedef std::chrono::high_resolution_clock hires_clock;
 
+    std::unique_ptr<BernZMQEvent[]> ZMQBufferUPtr;
+    uint32_t ZMQBufferCapacity_;
+    uint32_t ZMQBufferSizeBytes_;
+
   private:
-
-    typedef struct DTPBufferTimer{
-
-      unsigned int                         target_dtp_size;
-
-      hires_clock                          buffer_clock;
-      std::chrono::time_point<hires_clock> time_start;
-      std::chrono::time_point<hires_clock> time_end;
-      unsigned int                         buffer_sleep;
-
-      DTPBufferTimer() { target_dtp_size=0; buffer_sleep=0; }
-
-      void set_target_size(unsigned int t) { target_dtp_size = t; }
-
-      void t_start()      { time_start = buffer_clock.now(); }
-      void t_end()        { time_end = buffer_clock.now(); }
-      int  nanosec()    { return std::chrono::nanoseconds(time_end-time_start).count(); }
-      bool check_time() { t_end(); if( (unsigned int)(nanosec()) < buffer_sleep) return false; else return true; }
-
-      int end_and_update(size_t nevents, unsigned int max_time)
-      {
-	t_end(); int ns = nanosec(); t_start();
-       
-	if(ns>0) { 
-	  if(nevents==0){ if(target_dtp_size==0) buffer_sleep=0; else buffer_sleep += 1e6; }
-	  else { buffer_sleep = ns * (float)(target_dtp_size)/(float)(nevents); }
-	}
-
-	if(buffer_sleep > max_time) buffer_sleep = max_time;
-
-	return ns;
-      }
-
-    } DTPBufferTimer_t;
 
     typedef struct FEBBuffer{
 
-      FEBEventBuffer_t               buffer;
-      FEBEventTimeBuffer_t           timebuffer;
-      FEBEventsDroppedBuffer_t       droppedbuffer;
-      FEBEventsCorrectedTimeBuffer_t correctedtimebuffer;
+      EventBuffer_t               buffer;
+      EventTimeBuffer_t           timebuffer;
+      EventsDroppedBuffer_t       droppedbuffer;
+      EventsCorrectedTimeBuffer_t correctedtimebuffer;
 
       std::unique_ptr<std::mutex>  mutexptr;
       uint32_t                     overwritten_counter;
       uint32_t                     max_time_diff;
-      DTPBufferTimer_t             timer;
       uint64_t                     id;
+      timeval                      last_timenow;
 
-      FEBBuffer(uint32_t capacity, uint32_t td, uint32_t target_dtp_size, uint64_t i)
-	: buffer(FEBEventBuffer_t(capacity)),
-	  timebuffer(FEBEventTimeBuffer_t(capacity)),
-	  droppedbuffer(FEBEventsDroppedBuffer_t(capacity)),
-	  correctedtimebuffer(FEBEventsCorrectedTimeBuffer_t(capacity)),
+      FEBBuffer(uint32_t capacity, uint32_t td, uint64_t i)
+	: buffer(EventBuffer_t(capacity)),
+	  timebuffer(EventTimeBuffer_t(capacity)),
+	  droppedbuffer(EventsDroppedBuffer_t(capacity)),
+	  correctedtimebuffer(EventsCorrectedTimeBuffer_t(capacity)),
 	  mutexptr(new std::mutex),
 	  overwritten_counter(0),
 	  max_time_diff(td),
 	  id(i)
-      { Init(); timer.set_target_size(target_dtp_size); timer.t_start(); }
-      FEBBuffer() { FEBBuffer(0,10000000,0,0); }
+      { Init(); }
+      FEBBuffer() { FEBBuffer(0,10000000,0); }
       void Init() {
 	buffer.clear();
 	timebuffer.clear();
 	correctedtimebuffer.clear();
 	mutexptr->unlock();
 	overwritten_counter = 0;
+	last_timenow.tv_sec = 0;
+	last_timenow.tv_usec = 0;
       }
     } FEBBuffer_t;
 
@@ -163,14 +129,16 @@ namespace bernfebdaq {
     uint32_t FEBBufferCapacity_;
     uint32_t FEBBufferSizeBytes_;
 
+    uint32_t SeqIDMinimumSec_;
+
     bool GetData();
     bool FillFragment(uint64_t const&, artdaq::FragmentPtrs &,bool clear_buffer=false);
 
-    size_t InsertIntoFEBBuffer(FEBBuffer_t &,size_t const&);
+    size_t InsertIntoFEBBuffer(FEBBuffer_t &,size_t,size_t,size_t);
     size_t EraseFromFEBBuffer(FEBBuffer_t &, size_t const&);
 
     std::string GetFEBIDString(uint64_t const& id) const;
-    void SendMetadataMetrics(BernFEBFragmentMetadata const& m);
+    void SendMetadataMetrics(BernZMQFragmentMetadata const& m);
     void UpdateBufferOccupancyMetrics(uint64_t const& ,size_t const&) const;
     
     WorkerThreadUPtr GetData_thread_;
