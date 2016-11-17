@@ -9,7 +9,7 @@ daq: {
     board_id: 3
 
     SubrunTimeWindowSize: 1e8    #in ns
-    SequenceTimeWindowSize: 1e8  #in ns
+    SequenceTimeWindowSize: 5e6  #in ns
 
     nADCBits: 12
     nChannels: 32
